@@ -1,5 +1,7 @@
 # Hiravi 🌐
 
+[日本語版 (README_ja.md)](./README_ja.md)
+
 **Global Slide Sharing Platform with Instant Multi-Language Translation**
 
 > H0 Hackathon 2026 — Track 3: Million-scale Global App
@@ -29,14 +31,19 @@ Upload a PDF slide deck → Get a web-native slideshow with automatic translatio
 
 ```
 ├── PROMPT.md              # Full project specification
-├── DRAWIO_PROMPT.md       # Architecture diagram (draw.io XML)
+├── docs/                  # Knowledge & reference docs
+│   ├── DRAWIO_PROMPT.md   # Architecture diagram (draw.io XML)
+│   ├── REFERENCE.md       # Hackathon rules & judging criteria
+│   └── *_KNOWLEDGE.md    # Technology references
 ├── src/                   # AWS CDK infrastructure code
 │   ├── bin/               # CDK app entry point
 │   ├── lib/               # Stack definitions (6 stacks)
 │   ├── lambda/            # Lambda function code (Python)
 │   └── layers/            # Lambda layers (Ghostscript)
-├── *_KNOWLEDGE.md         # Technology reference docs
-└── REFERENCE.md           # Hackathon rules & judging criteria
+├── .kiro/                 # AI-DLC workflow
+├── CLAUDE.md              # Claude agent rules
+├── AGENTS.md              # Codex agent rules
+└── GEMINI.md              # Gemini agent rules
 ```
 
 ## Key Design Decisions
