@@ -1,0 +1,5 @@
+pdf2image==1.17.0
+PyMuPDF==1.24.10
+boto3==1.35.0
+psycopg2-binary==2.9.9
+aws-sdk-dsql==0.1.0

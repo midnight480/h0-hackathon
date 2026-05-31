@@ -1,0 +1,22 @@
+{
+  "name": "hiravi-cdk",
+  "version": "0.1.0",
+  "bin": {
+    "hiravi-cdk": "bin/hiravi-cdk.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth"
+  },
+  "devDependencies": {
+    "@types/node": "22.5.0",
+    "aws-cdk": "2.1125.0",
+    "typescript": "5.6.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.257.0",
+    "constructs": "10.5.0"
+  }
+}

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# CDK output
+src/cdk.out/
+
+# TypeScript build output
+*.js
+*.d.ts
+*.js.map
+!src/cdk.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Lambda build artifacts
+src/layers/ghostscript/*.zip
+src/lambda/processing/__pycache__/
+src/lambda/processing/*.pyc

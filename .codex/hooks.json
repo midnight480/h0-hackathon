@@ -1,0 +1,1 @@
+{"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"'/Users/tetsuya/.agents/skills/agmsg/scripts/check-inbox.sh' 'codex' '/Users/tetsuya/Documents/src/h0-hackathon'"}]}]}}
