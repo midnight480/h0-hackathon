@@ -1,4 +1,5 @@
 # Agent/IDE local settings (keep AI-DLC files tracked)
+.claude/settings.local.json
 .codex/hooks.json
 .kiro/settings/
 
