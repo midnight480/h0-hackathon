@@ -1,7 +1,6 @@
-# Agent/IDE local settings
-.claude/
-.codex/
-.kiro/
+# Agent/IDE local settings (keep AI-DLC files tracked)
+.codex/hooks.json
+.kiro/settings/
 
 # Dependencies
 node_modules/
