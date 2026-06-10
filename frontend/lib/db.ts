@@ -14,7 +14,7 @@ export async function getDbClient(): Promise<Client> {
     user: 'admin',
     password: token,
     port: 5432,
-    ssl: { rejectUnauthorized: false },
+    ssl: true,
   })
 
   await client.connect()

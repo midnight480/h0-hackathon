@@ -77,8 +77,9 @@ function StatusBadge({ status }: { status: ProcessingStatus }) {
 
 function DashRow({ deck, username }: { deck: DeckRow; username: string }) {
   const ready = deck.status === 'ready'
+  const region = process.env.NEXT_PUBLIC_AWS_REGION ?? 'us-east-1'
   const coverUrl = deck.cover_image_key
-    ? `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${deck.cover_image_key}`
+    ? `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${deck.cover_image_key}`
     : '/placeholder.svg'
 
   const inner = (

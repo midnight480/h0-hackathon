@@ -3,7 +3,11 @@ import { Client } from "pg";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const ENDPOINT = process.env.DSQL_ENDPOINT ?? "5bt2y2lorvjy4vp4sgcvhrg3ra.dsql.us-east-1.on.aws";
+const ENDPOINT = process.env.DSQL_ENDPOINT;
+if (!ENDPOINT) {
+  console.error("環境変数 DSQL_ENDPOINT が設定されていません。");
+  process.exit(1);
+}
 const REGION = process.env.AWS_REGION ?? "us-east-1";
 
 async function main() {
@@ -16,7 +20,7 @@ async function main() {
     user: "admin",
     password: token,
     port: 5432,
-    ssl: { rejectUnauthorized: false },
+    ssl: true,
   });
 
   await client.connect();
