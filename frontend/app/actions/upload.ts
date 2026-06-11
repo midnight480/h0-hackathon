@@ -1,11 +1,12 @@
 'use server'
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { S3Client } from '@aws-sdk/client-s3'
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
 import { auth } from '@clerk/nextjs/server'
 import { randomUUID, randomBytes } from 'crypto'
 import { withDb } from '@/lib/db'
+import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 const sqs = new SQSClient({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -34,17 +35,22 @@ export async function getPresignedUploadUrl(filename: string, contentType: strin
   const safeName = sanitizeFilename(filename)
   const key = `uploads/${deckId}/${safeName}`
 
-  const url = await getSignedUrl(
-    s3,
-    new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET_NAME,
-      Key: key,
-      ContentType: contentType,
-    }),
-    { expiresIn: 300 },
-  )
+  // presigned POST: content-length-range で S3 側がサイズ上限を強制する
+  // （クライアント改ざんでは回避不可。超過分は S3 が EntityTooLarge で拒否）
+  const { url, fields } = await createPresignedPost(s3, {
+    Bucket: process.env.S3_BUCKET_NAME!,
+    Key: key,
+    Conditions: [
+      ['content-length-range', 1, MAX_UPLOAD_BYTES],
+      ['eq', '$Content-Type', 'application/pdf'],
+    ],
+    Fields: {
+      'Content-Type': 'application/pdf',
+    },
+    Expires: 300,
+  })
 
-  return { url, key, deckId }
+  return { url, fields, key, deckId }
 }
 
 function generateShortId(): string {
