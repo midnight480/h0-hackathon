@@ -11,8 +11,13 @@ export class HiraviStorageStack extends cdk.Stack {
     // メインバケット: PDF 元ファイル + スライド画像
     this.slideBucket = new s3.Bucket(this, "HiraviSlideBucket", {
       bucketName: cdk.Fn.sub("hiravi-slides-${AWS::AccountId}"),
-      // セキュリティ: パブリックアクセスをブロック (presigned URL で制御)
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      // ACLは全ブロック、バケットポリシーによる公開のみ許可 (OGP画像用)
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: true,
+        ignorePublicAcls: true,
+        blockPublicPolicy: false,
+        restrictPublicBuckets: false,
+      }),
       // 暗号化: SSE-S3
       encryption: s3.BucketEncryption.S3_MANAGED,
       // バージョニング: スライド更新時のロールバック用
