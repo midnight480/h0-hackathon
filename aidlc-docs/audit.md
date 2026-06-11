@@ -13,3 +13,11 @@
 **Context**: Inception - Requirements Analysis, Questions for description draft and extensions opt-in created.
 
 ---
+
+## AWS Resource Investigation
+**Timestamp**: 2026-06-11T10:30:00Z
+**User Input**: "フロントエンドのテスト中にファイルアップロード後のAWS側の処理が動いているか確認したい。認証情報を提供するので、S3やLambdaの状況を確認してほしい。"
+**AI Response**: 提供された認証情報を使用してAWSリソース（S3, SQS, Lambda）の調査を開始しました。リソース名の特定と、現在のメッセージ滞留状況、エラーログの有無を確認中です。
+**Context**: Inception - Troubleshooting Investigation for local testing.
+
+---
