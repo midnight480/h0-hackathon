@@ -32,11 +32,19 @@ import {
 import { cn } from '@/lib/utils'
 import { likeDeck } from '@/app/actions/deck'
 
-export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
+export function DeckViewer({
+  deck,
+  related,
+  initialLiked = false,
+}: {
+  deck: Deck
+  related: Deck[]
+  initialLiked?: boolean
+}) {
   const available: LanguageCode[] = [...new Set([deck.originalLanguage, ...deck.targetLanguages])]
   const [lang, setLang] = useState<LanguageCode>(deck.originalLanguage)
   const [index, setIndex] = useState(0)
-  const [liked, setLiked] = useState(false)
+  const [liked, setLiked] = useState(initialLiked)
   const [optimisticLikes, setOptimisticLikes] = useState(deck.likes)
   const [isPending, startTransition] = useTransition()
   const [showText, setShowText] = useState(true)
@@ -207,7 +215,11 @@ export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
                 setOptimisticLikes((n) => n + 1)
                 startTransition(async () => {
                   try {
-                    await likeDeck(deck.id)
+                    const res = await likeDeck(deck.id)
+                    if (res.alreadyLiked) {
+                      // サーバー側で既にいいね済み判定 → カウントを戻す
+                      setOptimisticLikes((n) => n - 1)
+                    }
                   } catch {
                     setLiked(false)
                     setOptimisticLikes((n) => n - 1)
@@ -216,7 +228,7 @@ export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
                 })
               }}
               variant={liked ? 'default' : 'outline'}
-              disabled={isPending}
+              disabled={isPending || liked}
               className="flex-1 gap-2"
             >
               <Heart className={cn('size-4', liked && 'fill-current')} />

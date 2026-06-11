@@ -3,6 +3,7 @@
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { withDb } from '@/lib/db'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -69,11 +70,58 @@ export async function toggleVisibility(deckId: string, isPublic: boolean) {
   revalidatePath('/dashboard')
 }
 
-export async function likeDeck(deckId: string) {
-  await withDb(async (client) => {
-    await client.query(
+const LIKED_COOKIE = 'liked_decks'
+const LIKED_MAX = 500
+
+export async function likeDeck(deckId: string): Promise<{ alreadyLiked: boolean }> {
+  const cookieStore = await cookies()
+
+  // 同一ブラウザ（未認証含む）が同じデッキに複数回いいねするのを防止
+  let liked: string[] = []
+  const raw = cookieStore.get(LIKED_COOKIE)?.value
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) liked = parsed.filter((v) => typeof v === 'string')
+    } catch {
+      liked = []
+    }
+  }
+
+  if (liked.includes(deckId)) {
+    return { alreadyLiked: true }
+  }
+
+  const { rowCount } = await withDb(async (client) =>
+    client.query(
       `UPDATE decks SET likes = likes + 1 WHERE id = $1 AND deleted_at IS NULL`,
       [deckId],
-    )
+    ),
+  )
+  if (!rowCount) throw new Error('Deck not found')
+
+  liked.push(deckId)
+  if (liked.length > LIKED_MAX) liked = liked.slice(-LIKED_MAX)
+
+  cookieStore.set(LIKED_COOKIE, JSON.stringify(liked), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
   })
+
+  return { alreadyLiked: false }
+}
+
+export async function hasLikedDeck(deckId: string): Promise<boolean> {
+  const cookieStore = await cookies()
+  const raw = cookieStore.get(LIKED_COOKIE)?.value
+  if (!raw) return false
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.includes(deckId)
+  } catch {
+    return false
+  }
 }

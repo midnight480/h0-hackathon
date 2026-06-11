@@ -10,9 +10,29 @@ import { withDb } from '@/lib/db'
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 const sqs = new SQSClient({ region: process.env.AWS_REGION ?? 'us-east-1' })
 
+function sanitizeFilename(filename: string): string {
+  // パス区切り・制御文字を除去し、ベース名のみ・長さ上限を適用
+  const base = filename.split(/[/\\]/).pop() ?? 'file'
+  const cleaned = base
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1f\x7f]/g, '') // 制御文字
+    .replace(/[^a-zA-Z0-9._-]/g, '_') // 許可文字以外を _ に
+    .replace(/^\.+/, '') // 先頭ドット除去
+    .slice(0, 200)
+  return cleaned || 'file'
+}
+
 export async function getPresignedUploadUrl(filename: string, contentType: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error('Unauthorized')
+
+  if (contentType !== 'application/pdf') {
+    throw new Error('Only PDF files are allowed')
+  }
+
   const deckId = randomUUID()
-  const key = `uploads/${deckId}/${filename}`
+  const safeName = sanitizeFilename(filename)
+  const key = `uploads/${deckId}/${safeName}`
 
   const url = await getSignedUrl(
     s3,
@@ -89,6 +109,19 @@ export async function enqueueProcessing(params: {
   category: string
   originalLanguage: string
 }) {
+  const { userId } = await auth()
+  if (!userId) throw new Error('Unauthorized')
+
+  // この deck が呼び出しユーザーの所有であることを検証
+  await withDb(async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      `SELECT id FROM decks
+       WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+      [params.deckId, userId],
+    )
+    if (rows.length === 0) throw new Error('Deck not found or unauthorized')
+  })
+
   await sqs.send(
     new SendMessageCommand({
       QueueUrl: process.env.SQS_QUEUE_URL,

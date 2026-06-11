@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation'
-import { clerkClient } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { DeckViewer } from '@/components/deck-viewer'
 import { type Deck, type Slide, type LanguageCode } from '@/lib/data'
 import { withDb } from '@/lib/db'
 import { getClerkUsers } from '@/lib/clerk-users'
+import { hasLikedDeck } from '@/app/actions/deck'
 
 async function getAuthorInfo(userId: string) {
   try {
@@ -21,7 +22,12 @@ async function getAuthorInfo(userId: string) {
   }
 }
 
-async function getDeckFromDb(userId: string, slug: string, authorInfo?: { name: string; avatarUrl: string }): Promise<Deck | null> {
+async function getDeckFromDb(
+  userId: string,
+  slug: string,
+  viewerId: string | null,
+  authorInfo?: { name: string; avatarUrl: string },
+): Promise<Deck | null> {
   try {
     return await withDb(async (client) => {
       const { rows } = await client.query<{
@@ -38,17 +44,21 @@ async function getDeckFromDb(userId: string, slug: string, authorInfo?: { name: 
         views: number
         likes: number
         status: string
+        is_public: boolean | null
         cover_image_key: string | null
         published_at: string
       }>(
         `SELECT id, slug, short_id, title, description, user_id, category, original_language,
-                target_languages, slide_count, views, likes, status, cover_image_key, published_at
+                target_languages, slide_count, views, likes, status, is_public, cover_image_key, published_at
          FROM decks
          WHERE user_id = $1 AND slug = $2 AND deleted_at IS NULL`,
         [userId, slug],
       )
       if (rows.length === 0) return null
       const d = rows[0]
+
+      // 非公開（is_public = false）のデッキは所有者のみ閲覧可能
+      if (d.is_public === false && viewerId !== d.user_id) return null
 
       const { rows: slideRows } = await client.query<{
         page_number: number
@@ -170,8 +180,9 @@ export default async function DeckPage({
   const { user, slug } = await params
   const username = decodeURIComponent(user).replace(/^@/, '')
 
+  const { userId: viewerId } = await auth()
   const authorInfo = await getAuthorInfo(username)
-  const deck: Deck | null = await getDeckFromDb(username, slug, authorInfo)
+  const deck: Deck | null = await getDeckFromDb(username, slug, viewerId, authorInfo)
 
   if (!deck) notFound()
 
@@ -196,12 +207,13 @@ export default async function DeckPage({
   }
 
   const related = await fetchRelated(deck.id, deck.category)
+  const initialLiked = await hasLikedDeck(deck.id)
 
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
       <main className="flex-1">
-        <DeckViewer deck={deck} related={related} />
+        <DeckViewer deck={deck} related={related} initialLiked={initialLiked} />
       </main>
       <SiteFooter />
     </div>
