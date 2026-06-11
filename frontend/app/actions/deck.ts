@@ -4,6 +4,7 @@ import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { randomUUID } from 'crypto'
 import { withDb } from '@/lib/db'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -70,58 +71,76 @@ export async function toggleVisibility(deckId: string, isPublic: boolean) {
   revalidatePath('/dashboard')
 }
 
-const LIKED_COOKIE = 'liked_decks'
-const LIKED_MAX = 500
+const ANON_COOKIE = 'anon_id'
 
-export async function likeDeck(deckId: string): Promise<{ alreadyLiked: boolean }> {
+// いいねの主体を識別する ID を返す。
+// 認証済みユーザーは Clerk の user_id、未認証は Cookie に保存した anon ID。
+// 未認証で anon ID が無い場合は新規発行して Cookie に保存する（Server Action 内でのみ可能）。
+async function resolveLikerId(allowCreate: boolean): Promise<string | null> {
+  const { userId } = await auth()
+  if (userId) return userId
+
   const cookieStore = await cookies()
+  const existing = cookieStore.get(ANON_COOKIE)?.value
+  if (existing) return existing
+  if (!allowCreate) return null
 
-  // 同一ブラウザ（未認証含む）が同じデッキに複数回いいねするのを防止
-  let liked: string[] = []
-  const raw = cookieStore.get(LIKED_COOKIE)?.value
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) liked = parsed.filter((v) => typeof v === 'string')
-    } catch {
-      liked = []
-    }
-  }
-
-  if (liked.includes(deckId)) {
-    return { alreadyLiked: true }
-  }
-
-  const { rowCount } = await withDb(async (client) =>
-    client.query(
-      `UPDATE decks SET likes = likes + 1 WHERE id = $1 AND deleted_at IS NULL`,
-      [deckId],
-    ),
-  )
-  if (!rowCount) throw new Error('Deck not found')
-
-  liked.push(deckId)
-  if (liked.length > LIKED_MAX) liked = liked.slice(-LIKED_MAX)
-
-  cookieStore.set(LIKED_COOKIE, JSON.stringify(liked), {
+  const anon = `anon:${randomUUID()}`
+  cookieStore.set(ANON_COOKIE, anon, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 60 * 60 * 24 * 365,
   })
+  return anon
+}
+
+export async function likeDeck(deckId: string): Promise<{ alreadyLiked: boolean }> {
+  const likerId = await resolveLikerId(true)
+  if (!likerId) throw new Error('Could not resolve liker')
+
+  try {
+    await withDb(async (client) => {
+      await client.query('BEGIN')
+      try {
+        // 複合主キー (deck_id, liker_id) により重複いいねは一意制約違反になる
+        await client.query(
+          `INSERT INTO deck_likes (deck_id, liker_id) VALUES ($1, $2)`,
+          [deckId, likerId],
+        )
+        const { rowCount } = await client.query(
+          `UPDATE decks SET likes = likes + 1 WHERE id = $1 AND deleted_at IS NULL`,
+          [deckId],
+        )
+        if (!rowCount) throw new Error('Deck not found')
+        await client.query('COMMIT')
+      } catch (e) {
+        await client.query('ROLLBACK')
+        throw e
+      }
+    })
+  } catch (e) {
+    // 23505 = unique_violation（既にいいね済み）
+    if ((e as { code?: string }).code === '23505') {
+      return { alreadyLiked: true }
+    }
+    throw e
+  }
 
   return { alreadyLiked: false }
 }
 
 export async function hasLikedDeck(deckId: string): Promise<boolean> {
-  const cookieStore = await cookies()
-  const raw = cookieStore.get(LIKED_COOKIE)?.value
-  if (!raw) return false
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) && parsed.includes(deckId)
-  } catch {
-    return false
-  }
+  // Server Component から呼ばれるため Cookie は新規発行しない（読み取りのみ）
+  const likerId = await resolveLikerId(false)
+  if (!likerId) return false
+
+  return withDb(async (client) => {
+    const { rows } = await client.query(
+      `SELECT 1 FROM deck_likes WHERE deck_id = $1 AND liker_id = $2 LIMIT 1`,
+      [deckId, likerId],
+    )
+    return rows.length > 0
+  }).catch(() => false)
 }

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS decks (
     file_key      TEXT,
     cover_image_key TEXT,
     is_public     BOOLEAN,
+    short_id      VARCHAR(8),
     published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -40,8 +41,17 @@ CREATE TABLE IF NOT EXISTS slide_texts (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- liker_id: Clerk user_id (authenticated) or "anon:<uuid>" (anonymous, cookie-backed)
+CREATE TABLE IF NOT EXISTS deck_likes (
+    deck_id    UUID        NOT NULL,
+    liker_id   TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (deck_id, liker_id)
+);
+
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_user_id   ON decks (user_id);
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_status    ON decks (status);
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_category  ON decks (category);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slides_deck_id  ON slides (deck_id, page_number);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slide_texts_slide_id ON slide_texts (slide_id, language_code);
+CREATE INDEX ASYNC IF NOT EXISTS idx_deck_likes_deck_id ON deck_likes (deck_id);
