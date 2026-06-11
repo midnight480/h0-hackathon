@@ -19,14 +19,14 @@ const env = {
 const dsqlStack = new HiraviDsqlStack(app, "HiraviDsqlStack", { env });
 
 // S3 バケット
-// CORS 許可オリジンは `-c frontendOrigins=https://example.vercel.app,http://localhost:3000` で指定。
-// 未指定時は localhost のみ（本番デプロイ時は必ず Vercel ドメインを指定すること）。
+// CORS 許可オリジン。`-c frontendOrigins=https://example.vercel.app,...` で上書き可能。
+// 未指定時は本番ドメイン(hiravi.vercel.app)と localhost を許可。
 const frontendOriginsCtx = app.node.tryGetContext("frontendOrigins") as
   | string
   | undefined;
 const corsOrigins = frontendOriginsCtx
   ? frontendOriginsCtx.split(",").map((o) => o.trim()).filter(Boolean)
-  : ["http://localhost:3000"];
+  : ["https://hiravi.vercel.app", "http://localhost:3000"];
 
 const storageStack = new HiraviStorageStack(app, "HiraviStorageStack", {
   env,
