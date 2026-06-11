@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as dsql from "aws-cdk-lib/aws-dsql";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 
 /**
@@ -63,15 +64,37 @@ export class HiraviVercelAccessStack extends cdk.Stack {
       user: vercelUser,
     });
 
-    // Outputs (Vercel 環境変数に設定する値)
+    // シークレットは CloudFormation Outputs に平文出力せず、Secrets Manager に格納する。
+    // (Outputs は cloudformation:DescribeStacks 権限を持つ全員に見えてしまうため)
+    const credentialsSecret = new secretsmanager.Secret(
+      this,
+      "HiraviVercelCredentials",
+      {
+        secretName: "hiravi/vercel-aws-credentials",
+        description: "AWS access key for the Vercel (Next.js) IAM user",
+        secretObjectValue: {
+          AWS_ACCESS_KEY_ID: cdk.SecretValue.unsafePlainText(
+            accessKey.accessKeyId
+          ),
+          AWS_SECRET_ACCESS_KEY: accessKey.secretAccessKey,
+        },
+      }
+    );
+
+    // Access Key ID はシークレットではない（ユーザー名相当）ため Output で可。
     new cdk.CfnOutput(this, "VercelAwsAccessKeyId", {
       value: accessKey.accessKeyId,
       description: "AWS Access Key ID for Vercel environment variables",
     });
 
-    new cdk.CfnOutput(this, "VercelAwsSecretAccessKey", {
-      value: accessKey.secretAccessKey.unsafeUnwrap(),
-      description: "AWS Secret Access Key for Vercel environment variables",
+    // シークレット値の取得方法（平文は出力しない）:
+    //   aws secretsmanager get-secret-value \
+    //     --secret-id hiravi/vercel-aws-credentials \
+    //     --query SecretString --output text
+    new cdk.CfnOutput(this, "VercelCredentialsSecretArn", {
+      value: credentialsSecret.secretArn,
+      description:
+        "Secrets Manager ARN holding the Vercel IAM access key (retrieve via get-secret-value)",
     });
   }
 }

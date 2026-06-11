@@ -73,6 +73,12 @@ export async function createDeckRecord(params: {
   const { userId } = await auth()
   if (!userId) throw new Error('Unauthorized')
 
+  // fileKey は getPresignedUploadUrl が発行した `uploads/{deckId}/...` 形式のみ許可。
+  // 他人の fileKey を指定して自分のデッキとして登録する攻撃を防ぐ。
+  if (!params.fileKey.startsWith(`uploads/${params.deckId}/`)) {
+    throw new Error('Invalid file key')
+  }
+
   const slug = toSlug(params.title, params.deckId)
   const shortId = generateShortId()
 
@@ -112,14 +118,16 @@ export async function enqueueProcessing(params: {
   const { userId } = await auth()
   if (!userId) throw new Error('Unauthorized')
 
-  // この deck が呼び出しユーザーの所有であることを検証
-  await withDb(async (client) => {
-    const { rows } = await client.query<{ id: string }>(
-      `SELECT id FROM decks
+  // この deck が呼び出しユーザーの所有であることを検証し、
+  // SQS に渡す file_key は DB に保存済みの値を使う（クライアント値を信頼しない）。
+  const fileKey = await withDb(async (client) => {
+    const { rows } = await client.query<{ file_key: string | null }>(
+      `SELECT file_key FROM decks
        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
       [params.deckId, userId],
     )
     if (rows.length === 0) throw new Error('Deck not found or unauthorized')
+    return rows[0].file_key
   })
 
   await sqs.send(
@@ -127,7 +135,7 @@ export async function enqueueProcessing(params: {
       QueueUrl: process.env.SQS_QUEUE_URL,
       MessageBody: JSON.stringify({
         deck_id: params.deckId,
-        file_key: params.fileKey,
+        file_key: fileKey,
         target_languages: params.targetLanguages,
         title: params.title,
         description: params.description,
