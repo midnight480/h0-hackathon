@@ -13,7 +13,7 @@ export function SiteFooter() {
               every language — without altering a single pixel of your slides.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-2">
             <FooterCol
               title="Product"
               links={[
@@ -23,19 +23,11 @@ export function SiteFooter() {
               ]}
             />
             <FooterCol
-              title="Company"
-              links={[
-                { href: '/', label: 'About' },
-                { href: '/', label: 'Blog' },
-                { href: '/', label: 'Careers' },
-              ]}
-            />
-            <FooterCol
               title="Legal"
               links={[
-                { href: '/', label: 'Privacy' },
-                { href: '/', label: 'Terms' },
-                { href: '/', label: 'Security' },
+                { href: '/privacy', label: 'Privacy' },
+                { href: '/terms', label: 'Terms' },
+                { href: '/security', label: 'Security' },
               ]}
             />
           </div>

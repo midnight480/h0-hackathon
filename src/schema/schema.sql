@@ -17,9 +17,11 @@ CREATE TABLE IF NOT EXISTS decks (
     status        TEXT        NOT NULL DEFAULT 'pending',
     file_key      TEXT,
     cover_image_key TEXT,
+    is_public     BOOLEAN,
     published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at    TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS slides (

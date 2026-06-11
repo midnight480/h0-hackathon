@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Eye,
   Heart,
   Layers,
   Loader2,
@@ -15,6 +14,8 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { DeckDeleteButton } from '@/components/deck-delete-button'
+import { DeckVisibilityToggle } from '@/components/deck-visibility-toggle'
 import { withDb } from '@/lib/db'
 import { type ProcessingStatus, formatCount, languageLabel } from '@/lib/data'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,7 @@ interface DeckRow {
   status: ProcessingStatus
   cover_image_key: string | null
   published_at: string
+  is_public: boolean | null
 }
 
 const STATUS: Record<
@@ -75,7 +77,7 @@ function StatusBadge({ status }: { status: ProcessingStatus }) {
   )
 }
 
-function DashRow({ deck, username }: { deck: DeckRow; username: string }) {
+function DashRow({ deck, username, userId }: { deck: DeckRow; username: string; userId: string }) {
   const ready = deck.status === 'ready'
   const region = process.env.NEXT_PUBLIC_AWS_REGION ?? 'us-east-1'
   const coverUrl = deck.cover_image_key
@@ -97,7 +99,8 @@ function DashRow({ deck, username }: { deck: DeckRow; username: string }) {
           <StatusBadge status={deck.status} />
           <Badge variant="outline" className="text-[10px]">
             {languageLabel(deck.original_language as any)} →{' '}
-            {deck.target_languages.map((l) => languageLabel(l as any)).join(', ')}
+            {deck.target_languages.slice(0, 4).map((l) => languageLabel(l as any)).join(', ')}
+            {deck.target_languages.length > 4 && ` +${deck.target_languages.length - 4}`}
           </Badge>
         </div>
         <h3 className="truncate font-heading text-base font-semibold text-foreground">
@@ -107,10 +110,6 @@ function DashRow({ deck, username }: { deck: DeckRow; username: string }) {
           <span className="flex items-center gap-1">
             <Layers className="size-3.5" />
             {deck.slide_count} slides
-          </span>
-          <span className="flex items-center gap-1">
-            <Eye className="size-3.5" />
-            {formatCount(deck.views)}
           </span>
           <span className="flex items-center gap-1">
             <Heart className="size-3.5" />
@@ -124,11 +123,20 @@ function DashRow({ deck, username }: { deck: DeckRow; username: string }) {
           </span>
         </div>
       </div>
-      {deck.status === 'failed' && (
-        <Button variant="outline" size="sm" className="hidden shrink-0 sm:inline-flex">
-          Retry
-        </Button>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {deck.status === 'failed' && (
+          <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+            Retry
+          </Button>
+        )}
+        {deck.status === 'ready' && (
+          <DeckVisibilityToggle
+            deckId={deck.id}
+            isPublic={deck.is_public ?? false}
+          />
+        )}
+        <DeckDeleteButton deckId={deck.id} />
+      </div>
     </div>
   )
 
@@ -148,9 +156,9 @@ export default async function DashboardPage() {
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<DeckRow>(
       `SELECT id, slug, title, original_language, target_languages,
-              slide_count, views, likes, status, cover_image_key, published_at
+              slide_count, views, likes, status, cover_image_key, published_at, is_public
        FROM decks
-       WHERE user_id = $1
+       WHERE user_id = $1 AND deleted_at IS NULL
        ORDER BY published_at DESC`,
       [userId],
     )
@@ -222,7 +230,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {decks.map((deck) => (
-                  <DashRow key={deck.id} deck={deck} username={userId} />
+                  <DashRow key={deck.id} deck={deck} username={userId} userId={userId} />
                 ))}
               </div>
             )}

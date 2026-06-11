@@ -4,7 +4,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
 import { auth } from '@clerk/nextjs/server'
-import { randomUUID } from 'crypto'
+import { randomUUID, randomBytes } from 'crypto'
 import { withDb } from '@/lib/db'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -25,6 +25,10 @@ export async function getPresignedUploadUrl(filename: string, contentType: strin
   )
 
   return { url, key, deckId }
+}
+
+function generateShortId(): string {
+  return randomBytes(4).toString('hex') // 8文字の16進数
 }
 
 function toSlug(title: string, deckId: string): string {
@@ -50,16 +54,18 @@ export async function createDeckRecord(params: {
   if (!userId) throw new Error('Unauthorized')
 
   const slug = toSlug(params.title, params.deckId)
+  const shortId = generateShortId()
 
   await withDb(async (client) => {
     await client.query(
       `INSERT INTO decks
-        (id, slug, title, description, user_id, category,
-         original_language, target_languages, file_key, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')`,
+        (id, slug, short_id, title, description, user_id, category,
+         original_language, target_languages, file_key, status, is_public)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', false)`,
       [
         params.deckId,
         slug,
+        shortId,
         params.title,
         params.description,
         userId,

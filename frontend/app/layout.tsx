@@ -3,6 +3,7 @@ import { shadcn } from '@clerk/ui/themes'
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
+import Script from 'next/script'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
@@ -36,15 +37,17 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} bg-background`}
     >
       <body className="font-sans antialiased">
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
         <ClerkProvider appearance={{ theme: shadcn }}>
-          <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-          >
-          <div className="flex min-h-screen flex-col">{children}</div>
-          <Toaster position="bottom-right" />
+          <ThemeProvider>
+            <div className="flex min-h-screen flex-col">{children}</div>
+            <Toaster position="bottom-right" />
           </ThemeProvider>
           {process.env.NODE_ENV === 'production' && <Analytics />}
         </ClerkProvider>

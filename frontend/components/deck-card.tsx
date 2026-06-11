@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Eye, Heart, Layers } from 'lucide-react'
+import { Heart, Layers } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { type Deck, formatCount, languageLabel } from '@/lib/data'
@@ -55,10 +55,6 @@ export function DeckCard({ deck }: { deck: Deck }) {
             <span className="flex items-center gap-1">
               <Heart className="size-3.5" />
               {formatCount(deck.likes)}
-            </span>
-            <span className="flex items-center gap-1">
-              <Eye className="size-3.5" />
-              {formatCount(deck.views)}
             </span>
           </div>
         </div>
