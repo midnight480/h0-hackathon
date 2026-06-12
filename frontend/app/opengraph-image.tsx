@@ -62,7 +62,7 @@ export default function OpengraphImage() {
         {/* フッター */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', width: 48, height: 8, background: VERMILLION, borderRadius: 4 }} />
-          <span style={{ fontSize: 28, color: '#5B584F' }}>hiravi.vercel.app</span>
+          <span style={{ fontSize: 28, color: '#5B584F' }}>hiravi.midnight480.com</span>
         </div>
       </div>
     ),

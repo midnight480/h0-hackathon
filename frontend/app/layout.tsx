@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://hiravi.vercel.app'),
+  metadataBase: new URL('https://hiravi.midnight480.com'),
   title: 'Hiravi — Share slides across every language',
   description:
     'Upload a PDF deck and Hiravi instantly turns it into a web-native slideshow with machine translations in 75+ languages. Opening knowledge to the world.',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     title: 'Hiravi — Share slides across every language',
     description:
       'Upload a PDF deck once and read any deck in your language with instant AI translation in 75+ languages.',
-    url: 'https://hiravi.vercel.app',
+    url: 'https://hiravi.midnight480.com',
     locale: 'en_US',
   },
   twitter: {
