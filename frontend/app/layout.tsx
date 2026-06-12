@@ -1,6 +1,7 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import { shadcn } from '@clerk/ui/themes'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
 import Script from 'next/script'
@@ -67,6 +68,7 @@ export default function RootLayout({
             <Toaster position="bottom-right" />
           </ThemeProvider>
           {process.env.NODE_ENV === 'production' && <Analytics />}
+          <SpeedInsights />
         </ClerkProvider>
       </body>
     </html>
