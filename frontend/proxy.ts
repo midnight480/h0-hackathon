@@ -11,7 +11,6 @@ const isPublicRoute = createRouteMatcher([
   "/terms",
   "/security",
   "/monitoring(.*)", // Sentry トンネルルート
-  "/sentry-example-page",
   "/opengraph-image(.*)", // OGP 画像（SNS クローラがアクセス）
   "/twitter-image(.*)",
 ]);
