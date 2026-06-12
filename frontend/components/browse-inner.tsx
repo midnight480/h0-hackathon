@@ -19,12 +19,14 @@ import {
   type Category,
   type LanguageCode,
 } from '@/lib/data'
+import { useT } from '@/lib/i18n/locale-provider'
 import { cn } from '@/lib/utils'
 
 type Sort = 'trending' | 'recent' | 'liked'
 
 function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: number }) {
   const params = useSearchParams()
+  const t = useT()
   const [q, setQ] = useState(params.get('q') ?? '')
   const [category, setCategory] = useState<Category | 'all'>(
     (params.get('category') as Category) ?? 'all',
@@ -63,18 +65,18 @@ function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: numbe
       <div className="border-b border-border bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
-            Browse decks
+            {t('browse.title')}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Explore {decks.length} talks across {totalLanguages} languages.
+            {t('browse.subtitle', { decks: decks.length, languages: totalLanguages })}
           </p>
           <div className="relative mt-6 max-w-lg">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search talks, topics, or authors…"
-              aria-label="Search slide decks"
+              placeholder={t('browse.searchPlaceholder')}
+              aria-label={t('browse.searchAria')}
               className="h-12 rounded-lg bg-card pl-11"
             />
           </div>
@@ -95,7 +97,7 @@ function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: numbe
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
-                {c.label}
+                {t(`categories.${c.value}`)}
               </button>
             ))}
           </div>
@@ -105,11 +107,11 @@ function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: numbe
               value={language}
               onValueChange={(v) => setLanguage(v as LanguageCode | 'all')}
             >
-              <SelectTrigger className="h-9 w-[140px]" aria-label="Filter by language">
-                <SelectValue placeholder="Language" />
+              <SelectTrigger className="h-9 w-[140px]" aria-label={t('browse.filterLanguageAria')}>
+                <SelectValue placeholder={t('browse.languagePlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All languages</SelectItem>
+                <SelectItem value="all">{t('browse.allLanguages')}</SelectItem>
                 {LANGUAGES.map((l) => (
                   <SelectItem key={l.code} value={l.code}>
                     {l.native}
@@ -119,14 +121,14 @@ function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: numbe
             </Select>
 
             <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-              <SelectTrigger className="h-9 w-[130px]" aria-label="Sort decks">
+              <SelectTrigger className="h-9 w-[130px]" aria-label={t('browse.sortAria')}>
                 <SlidersHorizontal className="size-4 text-muted-foreground" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="trending">Trending</SelectItem>
-                <SelectItem value="recent">Recent</SelectItem>
-                <SelectItem value="liked">Most liked</SelectItem>
+                <SelectItem value="trending">{t('browse.sortTrending')}</SelectItem>
+                <SelectItem value="recent">{t('browse.sortRecent')}</SelectItem>
+                <SelectItem value="liked">{t('browse.sortLiked')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -135,9 +137,16 @@ function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: numbe
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <p className="mb-6 text-sm text-muted-foreground">
-          {results.length} {results.length === 1 ? 'result' : 'results'}
+          {t(
+            results.length === 1 ? 'browse.resultsCount' : 'browse.resultsCountPlural',
+            { count: results.length },
+          )}
           {q.trim() && (
-            <> for <span className="font-medium text-foreground">{q.trim()}</span></>
+            <>
+              {' '}
+              {t('browse.resultsFor')}{' '}
+              <span className="font-medium text-foreground">{q.trim()}</span>
+            </>
           )}
         </p>
 
@@ -150,9 +159,9 @@ function Inner({ decks, totalLanguages }: { decks: Deck[]; totalLanguages: numbe
         ) : (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20 text-center">
             <Search className="mb-3 size-8 text-muted-foreground" />
-            <p className="font-heading text-lg font-semibold text-foreground">No decks found</p>
+            <p className="font-heading text-lg font-semibold text-foreground">{t('browse.noResultsTitle')}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Try a different search or clear your filters.
+              {t('browse.noResultsBody')}
             </p>
           </div>
         )}

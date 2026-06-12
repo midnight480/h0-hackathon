@@ -29,6 +29,7 @@ import {
   formatCount,
   languageLabel,
 } from '@/lib/data'
+import { useT } from '@/lib/i18n/locale-provider'
 import { cn } from '@/lib/utils'
 import { likeDeck } from '@/app/actions/deck'
 
@@ -41,6 +42,7 @@ export function DeckViewer({
   related: Deck[]
   initialLiked?: boolean
 }) {
+  const t = useT()
   const available: LanguageCode[] = [...new Set([deck.originalLanguage, ...deck.targetLanguages])]
   const [lang, setLang] = useState<LanguageCode>(deck.originalLanguage)
   const [index, setIndex] = useState(0)
@@ -71,9 +73,9 @@ export function DeckViewer({
     const url = deck.shortId ? `${origin}/s/${deck.shortId}` : window.location.href
     try {
       await navigator.clipboard.writeText(url)
-      toast.success('Link copied to clipboard')
+      toast.success(t('viewer.linkCopied'))
     } catch {
-      toast.error('Could not copy link')
+      toast.error(t('viewer.linkFailed'))
     }
   }
 
@@ -83,10 +85,10 @@ export function DeckViewer({
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="mb-2 flex items-center gap-2">
-            <Badge variant="secondary" className="capitalize">{deck.category}</Badge>
+            <Badge variant="secondary">{t(`categories.${deck.category}`)}</Badge>
             <Badge variant="outline" className="gap-1">
               <Languages className="size-3" />
-              {available.length} languages
+              {t('viewer.languagesCount', { count: available.length })}
             </Badge>
           </div>
           <h1 className="text-balance font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -108,7 +110,7 @@ export function DeckViewer({
               <button
                 onClick={() => go(-1)}
                 disabled={index === 0}
-                aria-label="Previous slide"
+                aria-label={t('viewer.prevSlide')}
                 className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/90 p-2 text-foreground shadow-sm backdrop-blur transition hover:bg-background disabled:pointer-events-none disabled:opacity-0"
               >
                 <ChevronLeft className="size-5" />
@@ -116,7 +118,7 @@ export function DeckViewer({
               <button
                 onClick={() => go(1)}
                 disabled={index === total - 1}
-                aria-label="Next slide"
+                aria-label={t('viewer.nextSlide')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/90 p-2 text-foreground shadow-sm backdrop-blur transition hover:bg-background disabled:pointer-events-none disabled:opacity-0"
               >
                 <ChevronRight className="size-5" />
@@ -126,20 +128,20 @@ export function DeckViewer({
             {/* Controls bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-9" onClick={() => go(-1)} disabled={index === 0} aria-label="Previous">
+                <Button variant="outline" size="icon" className="size-9" onClick={() => go(-1)} disabled={index === 0} aria-label={t('viewer.prevSlide')}>
                   <ChevronLeft className="size-4" />
                 </Button>
                 <span className="min-w-16 text-center text-sm font-medium tabular-nums text-foreground">
                   {index + 1} / {total}
                 </span>
-                <Button variant="outline" size="icon" className="size-9" onClick={() => go(1)} disabled={index === total - 1} aria-label="Next">
+                <Button variant="outline" size="icon" className="size-9" onClick={() => go(1)} disabled={index === total - 1} aria-label={t('viewer.nextSlide')}>
                   <ChevronRight className="size-4" />
                 </Button>
               </div>
 
               <div className="flex items-center gap-2">
                 <Select value={lang} onValueChange={(v) => setLang(v as LanguageCode)}>
-                  <SelectTrigger className="h-9 w-[150px]" aria-label="Reading language">
+                  <SelectTrigger className="h-9 w-[150px]" aria-label={t('viewer.readingLanguage')}>
                     <Languages className="size-4 text-accent" />
                     <SelectValue />
                   </SelectTrigger>
@@ -147,7 +149,7 @@ export function DeckViewer({
                     {available.map((code) => (
                       <SelectItem key={code} value={code}>
                         {LANGUAGES.find((l) => l.code === code)?.native ?? code}
-                        {code === deck.originalLanguage ? ' (original)' : ''}
+                        {code === deck.originalLanguage ? t('viewer.original') : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -158,7 +160,7 @@ export function DeckViewer({
                   className="h-9"
                   onClick={() => setShowText((s) => !s)}
                 >
-                  {showText ? 'Hide text' : 'Show text'}
+                  {showText ? t('viewer.hideText') : t('viewer.showText')}
                 </Button>
               </div>
             </div>
@@ -172,12 +174,12 @@ export function DeckViewer({
                 {languageLabel(lang)}
                 {lang !== deck.originalLanguage && (
                   <Badge variant="secondary" className="ml-1 text-[10px]">
-                    AI translated
+                    {t('viewer.aiTranslated')}
                   </Badge>
                 )}
               </div>
               <p className="text-pretty text-lg leading-relaxed text-foreground">
-                {slideText || 'No extracted text for this slide.'}
+                {slideText || t('viewer.noText')}
               </p>
             </div>
           )}
@@ -185,14 +187,14 @@ export function DeckViewer({
           {/* Thumbnails */}
           <div className="mt-6">
             <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-              All slides
+              {t('viewer.allSlides')}
             </h2>
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
               {deck.slides.map((s, i) => (
                 <button
                   key={s.pageNumber}
                   onClick={() => setIndex(i)}
-                  aria-label={`Go to slide ${i + 1}`}
+                  aria-label={`${t('viewer.allSlides')} ${i + 1}`}
                   className={cn(
                     'relative aspect-[16/10] overflow-hidden rounded-md border-2 bg-muted transition',
                     i === index ? 'border-accent' : 'border-transparent hover:border-border',
@@ -223,7 +225,7 @@ export function DeckViewer({
                   } catch {
                     setLiked(false)
                     setOptimisticLikes((n) => n - 1)
-                    toast.error('Failed to like')
+                    toast.error(t('viewer.failedToLike'))
                   }
                 })
               }}
@@ -236,7 +238,7 @@ export function DeckViewer({
             </Button>
             <Button variant="outline" className="flex-1 gap-2" onClick={share}>
               <Share2 className="size-4" />
-              Share
+              {t('viewer.share')}
             </Button>
           </div>
 
@@ -263,14 +265,14 @@ export function DeckViewer({
               </div>
               <div className="flex items-center gap-1.5">
                 <Maximize2 className="size-4" />
-                {deck.slideCount} slides
+                {t('viewer.slidesCount', { count: deck.slideCount })}
               </div>
             </dl>
           </div>
 
           {/* Tags */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="mb-3 text-sm font-medium text-muted-foreground">Tags</h2>
+            <h2 className="mb-3 text-sm font-medium text-muted-foreground">{t('viewer.tags')}</h2>
             <div className="flex flex-wrap gap-2">
               {deck.tags.map((tag) => (
                 <Link
@@ -283,7 +285,7 @@ export function DeckViewer({
               ))}
             </div>
             <div className="mt-4 border-t border-border pt-4">
-              <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Published</p>
+              <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">{t('viewer.published')}</p>
               <p className="text-sm text-foreground">
                 {new Date(deck.publishedAt).toLocaleDateString('en-US', {
                   year: 'numeric',
@@ -300,7 +302,7 @@ export function DeckViewer({
       {related.length > 0 && (
         <section className="mt-16">
           <h2 className="mb-6 font-heading text-2xl font-bold tracking-tight text-foreground">
-            More like this
+            {t('viewer.moreLikeThis')}
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {related.map((d) => (

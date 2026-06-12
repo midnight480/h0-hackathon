@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { CATEGORIES, LANGUAGES, type Deck, type LanguageCode, formatCount } from '@/lib/data'
 import { withDb } from '@/lib/db'
 import { getClerkUsers } from '@/lib/clerk-users'
+import { getServerI18n } from '@/lib/i18n'
 
 async function fetchFeatured(): Promise<{ decks: Deck[]; totalDecks: number; totalLikes: number }> {
   try {
@@ -70,6 +71,7 @@ async function fetchFeatured(): Promise<{ decks: Deck[]; totalDecks: number; tot
 
 export default async function HomePage() {
   const { decks, totalDecks, totalLikes } = await fetchFeatured()
+  const { t } = await getServerI18n()
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -81,26 +83,25 @@ export default async function HomePage() {
           <div className="mx-auto flex max-w-7xl flex-col items-center px-4 py-20 text-center sm:px-6 lg:px-8 lg:py-28">
             <Badge variant="secondary" className="mb-6 gap-1.5 rounded-full px-3 py-1">
               <Sparkles className="size-3.5 text-accent" />
-              Instant AI translation for every deck
+              {t('home.badge')}
             </Badge>
             <h1 className="max-w-3xl text-balance font-heading text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Great ideas shouldn&apos;t stop at a language border
+              {t('home.heroTitle')}
             </h1>
             <p className="mt-6 max-w-xl text-pretty text-lg leading-relaxed text-muted-foreground">
-              Hiravi lets you upload a slide deck once and share it in every
-              language. Read any talk in your own tongue, instantly.
+              {t('home.heroSubtitle')}
             </p>
             <div className="mt-10 flex w-full flex-col items-center gap-4">
               <HeroSearch />
               <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-                <span>Categories:</span>
+                <span>{t('home.categoriesLabel')}</span>
                 {CATEGORIES.filter((c) => c.value !== 'all').map((c) => (
                   <Link
                     key={c.value}
                     href={`/browse?category=${c.value}`}
                     className="rounded-full border border-border bg-card px-3 py-1 transition-colors hover:border-accent hover:text-accent"
                   >
-                    {c.label}
+                    {t(`categories.${c.value}`)}
                   </Link>
                 ))}
               </div>
@@ -108,9 +109,9 @@ export default async function HomePage() {
 
             <dl className="mt-14 grid w-full max-w-2xl grid-cols-3 gap-4">
               {[
-                { icon: Globe, label: 'Supported Languages', value: `${LANGUAGES.length}` },
-                { icon: Zap, label: 'Decks', value: `${totalDecks}` },
-                { icon: Heart, label: 'Likes', value: formatCount(totalLikes) },
+                { icon: Globe, label: t('home.statLanguages'), value: `${LANGUAGES.length}` },
+                { icon: Zap, label: t('home.statDecks'), value: `${totalDecks}` },
+                { icon: Heart, label: t('home.statLikes'), value: formatCount(totalLikes) },
               ].map((s) => (
                 <div
                   key={s.label}
@@ -134,9 +135,9 @@ export default async function HomePage() {
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
             <div className="grid gap-8 md:grid-cols-3">
               {[
-                { step: '01', title: 'Upload your PDF', body: 'Drop in any slide deck. We extract the text from every page automatically.' },
-                { step: '02', title: 'We translate it', body: 'Each slide is translated into your chosen languages while we render crisp previews.' },
-                { step: '03', title: 'Share worldwide', body: 'Readers pick their language and follow along — no copy-paste, no friction.' },
+                { step: '01', title: t('home.step1Title'), body: t('home.step1Body') },
+                { step: '02', title: t('home.step2Title'), body: t('home.step2Body') },
+                { step: '03', title: t('home.step3Title'), body: t('home.step3Body') },
               ].map((s) => (
                 <div key={s.step} className="flex flex-col gap-3">
                   <span className="font-heading text-sm font-semibold text-accent">{s.step}</span>
@@ -153,17 +154,17 @@ export default async function HomePage() {
           <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="font-heading text-3xl font-bold tracking-tight text-foreground">
-                Featured decks
+                {t('home.featuredTitle')}
               </h2>
               <p className="mt-1 text-muted-foreground">
-                Popular talks from creators around the world.
+                {t('home.featuredSubtitle')}
               </p>
             </div>
             <Link
               href="/browse"
               className="group flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
             >
-              Browse all
+              {t('home.browseAll')}
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -175,7 +176,7 @@ export default async function HomePage() {
                 href={`/browse?category=${c.value}`}
                 className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
               >
-                {c.label}
+                {t(`categories.${c.value}`)}
               </Link>
             ))}
           </div>
@@ -187,7 +188,7 @@ export default async function HomePage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No decks yet. Be the first to upload!</p>
+            <p className="text-sm text-muted-foreground">{t('home.empty')}</p>
           )}
         </section>
 
@@ -195,16 +196,16 @@ export default async function HomePage() {
         <section className="border-t border-border bg-foreground text-background">
           <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 py-20 text-center sm:px-6 lg:px-8">
             <h2 className="max-w-2xl text-balance font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-              Your next talk deserves a global audience
+              {t('home.ctaTitle')}
             </h2>
             <p className="max-w-lg text-pretty leading-relaxed text-background/70">
-              Upload a deck and watch it reach readers who never could have read it before.
+              {t('home.ctaBody')}
             </p>
             <Link
               href="/upload"
               className="inline-flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 font-medium text-accent-foreground transition-transform hover:scale-[1.02]"
             >
-              Upload your first deck
+              {t('home.ctaButton')}
               <ArrowRight className="size-4" />
             </Link>
           </div>
