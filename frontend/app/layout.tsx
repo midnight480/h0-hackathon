@@ -66,7 +66,7 @@ export default function RootLayout({
             <div className="flex min-h-screen flex-col">{children}</div>
             <Toaster position="bottom-right" />
           </ThemeProvider>
-          {process.env.NODE_ENV === 'production' && <Analytics />}
+          <Analytics />
         </ClerkProvider>
       </body>
     </html>
