@@ -219,7 +219,7 @@ export default function UploadPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
                   <Label>Category</Label>
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select value={category} onValueChange={(v) => setCategory(v ?? 'tech')}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
