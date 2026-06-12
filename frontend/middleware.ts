@@ -10,6 +10,8 @@ const isPublicRoute = createRouteMatcher([
   "/privacy",
   "/terms",
   "/security",
+  "/monitoring(.*)", // Sentry トンネルルート
+  "/sentry-example-page",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

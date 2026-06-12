@@ -1,3 +1,5 @@
+import { withSentryConfig } from '@sentry/nextjs'
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   // クリックジャッキング防止（iframe 埋め込み禁止）
@@ -33,4 +35,23 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  org: 'midnight480',
+  project: 'h0-hackathon',
+
+  // ビルドログでの Sentry CLI 出力を抑制（CI では false 推奨）
+  silent: !process.env.CI,
+
+  // ソースマップのアップロードには SENTRY_AUTH_TOKEN が必要（Vercel 環境変数に設定）。
+  // 未設定でもビルドは通る（アップロードがスキップされるだけ）。
+  widenClientFileUpload: true,
+
+  // Sentry のトンネリングで広告ブロッカーによるイベント欠落を回避
+  tunnelRoute: '/monitoring',
+
+  // ロガー呼び出しのツリーシェイク（バンドル削減）
+  disableLogger: true,
+
+  // Vercel Cron Monitors の自動計測
+  automaticVercelMonitors: true,
+})

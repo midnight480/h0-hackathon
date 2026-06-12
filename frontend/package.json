@@ -18,6 +18,7 @@
     "@clerk/nextjs": "^7.5.1",
     "@clerk/shared": "^4.17.0",
     "@clerk/ui": "^1.15.0",
+    "@sentry/nextjs": "^10.57.0",
     "@vercel/analytics": "1.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -40,5 +41,10 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "typescript": "5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@sentry/cli"
+    ]
   }
 }
