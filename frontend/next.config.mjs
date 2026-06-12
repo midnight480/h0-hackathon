@@ -48,10 +48,4 @@ export default withSentryConfig(nextConfig, {
 
   // Sentry のトンネリングで広告ブロッカーによるイベント欠落を回避
   tunnelRoute: '/monitoring',
-
-  // ロガー呼び出しのツリーシェイク（バンドル削減）
-  disableLogger: true,
-
-  // Vercel Cron Monitors の自動計測
-  automaticVercelMonitors: true,
 })
