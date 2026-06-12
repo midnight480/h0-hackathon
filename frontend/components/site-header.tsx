@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, Upload } from 'lucide-react'
-import { SignInButton, SignUpButton, Show, UserButton } from '@clerk/nextjs'
+import { useAuth, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ const NAV = [
 
 export function SiteHeader() {
   const pathname = usePathname()
+  const { isLoaded, isSignedIn } = useAuth()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/80 backdrop-blur-md">
@@ -50,27 +51,31 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Show when="signed-in">
-            <Button
-              render={<Link href="/upload" />}
-              nativeButton={false}
-              variant="default"
-              size="sm"
-              className="hidden sm:inline-flex"
-            >
-              <Upload className="size-4" />
-              Upload
-            </Button>
-            <UserButton afterSignOutUrl="/" />
-          </Show>
-          <Show when="signed-out">
-            <SignInButton mode="modal">
-              <Button variant="ghost" size="sm">Sign in</Button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <Button variant="default" size="sm">Sign up</Button>
-            </SignUpButton>
-          </Show>
+          {isLoaded && isSignedIn && (
+            <>
+              <Button
+                render={<Link href="/upload" />}
+                nativeButton={false}
+                variant="default"
+                size="sm"
+                className="hidden sm:inline-flex"
+              >
+                <Upload className="size-4" />
+                Upload
+              </Button>
+              <UserButton />
+            </>
+          )}
+          {isLoaded && !isSignedIn && (
+            <>
+              <SignInButton mode="modal">
+                <Button variant="ghost" size="sm">Sign in</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button variant="default" size="sm">Sign up</Button>
+              </SignUpButton>
+            </>
+          )}
 
           <Sheet>
             <SheetTrigger

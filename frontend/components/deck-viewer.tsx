@@ -1,14 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   ChevronLeft,
   ChevronRight,
-  Eye,
   Heart,
   Languages,
-  Link2,
   Maximize2,
   Share2,
 } from 'lucide-react'
@@ -32,12 +30,23 @@ import {
   languageLabel,
 } from '@/lib/data'
 import { cn } from '@/lib/utils'
+import { likeDeck } from '@/app/actions/deck'
 
-export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
-  const available: LanguageCode[] = [deck.originalLanguage, ...deck.targetLanguages]
+export function DeckViewer({
+  deck,
+  related,
+  initialLiked = false,
+}: {
+  deck: Deck
+  related: Deck[]
+  initialLiked?: boolean
+}) {
+  const available: LanguageCode[] = [...new Set([deck.originalLanguage, ...deck.targetLanguages])]
   const [lang, setLang] = useState<LanguageCode>(deck.originalLanguage)
   const [index, setIndex] = useState(0)
-  const [liked, setLiked] = useState(false)
+  const [liked, setLiked] = useState(initialLiked)
+  const [optimisticLikes, setOptimisticLikes] = useState(deck.likes)
+  const [isPending, startTransition] = useTransition()
   const [showText, setShowText] = useState(true)
 
   const slide = deck.slides[index]
@@ -58,7 +67,8 @@ export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
   const slideText = slide?.text?.[lang] ?? slide?.text?.[deck.originalLanguage] ?? slide?.text?.en
 
   const share = async () => {
-    const url = typeof window !== 'undefined' ? window.location.href : ''
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const url = deck.shortId ? `${origin}/s/${deck.shortId}` : window.location.href
     try {
       await navigator.clipboard.writeText(url)
       toast.success('Link copied to clipboard')
@@ -200,21 +210,33 @@ export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
           <div className="flex items-center gap-3">
             <Button
               onClick={() => {
-                setLiked((l) => !l)
-                toast(liked ? 'Removed like' : 'Liked this deck')
+                if (liked || isPending) return
+                setLiked(true)
+                setOptimisticLikes((n) => n + 1)
+                startTransition(async () => {
+                  try {
+                    const res = await likeDeck(deck.id)
+                    if (res.alreadyLiked) {
+                      // サーバー側で既にいいね済み判定 → カウントを戻す
+                      setOptimisticLikes((n) => n - 1)
+                    }
+                  } catch {
+                    setLiked(false)
+                    setOptimisticLikes((n) => n - 1)
+                    toast.error('Failed to like')
+                  }
+                })
               }}
               variant={liked ? 'default' : 'outline'}
+              disabled={isPending || liked}
               className="flex-1 gap-2"
             >
               <Heart className={cn('size-4', liked && 'fill-current')} />
-              {formatCount(deck.likes + (liked ? 1 : 0))}
+              {formatCount(optimisticLikes)}
             </Button>
             <Button variant="outline" className="flex-1 gap-2" onClick={share}>
               <Share2 className="size-4" />
               Share
-            </Button>
-            <Button variant="outline" size="icon" onClick={share} aria-label="Copy link">
-              <Link2 className="size-4" />
             </Button>
           </div>
 
@@ -229,7 +251,6 @@ export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
                 <p className="font-heading font-semibold text-foreground">
                   {deck.author.name}
                 </p>
-                <p className="text-sm text-muted-foreground">@{deck.author.username}</p>
               </div>
             </Link>
             <p className="mt-4 text-pretty text-sm leading-relaxed text-muted-foreground">
@@ -237,12 +258,8 @@ export function DeckViewer({ deck, related }: { deck: Deck; related: Deck[] }) {
             </p>
             <dl className="mt-4 flex items-center gap-5 border-t border-border pt-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1.5">
-                <Eye className="size-4" />
-                {formatCount(deck.views)}
-              </div>
-              <div className="flex items-center gap-1.5">
                 <Heart className="size-4" />
-                {formatCount(deck.likes)}
+                {formatCount(optimisticLikes)}
               </div>
               <div className="flex items-center gap-1.5">
                 <Maximize2 className="size-4" />

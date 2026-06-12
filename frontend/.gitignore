@@ -3,3 +3,8 @@
 node_modules/
 .next/
 out/
+tsconfig.tsbuildinfo
+
+# Sentry
+.env.sentry-build-plugin
+.sentryclirc

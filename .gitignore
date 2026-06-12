@@ -34,6 +34,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Temporary / generated files
+response.json
+
 # Lambda build artifacts
 src/layers/ghostscript/*.zip
 src/lambda/processing/__pycache__/

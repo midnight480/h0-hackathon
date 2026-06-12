@@ -2,11 +2,22 @@ import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 
+export interface HiraviStorageStackProps extends cdk.StackProps {
+  /**
+   * ブラウザからの直接アップロード(presigned PUT/POST)を許可するオリジン。
+   * Vercel の本番ドメインや localhost を指定する。
+   * 未指定の場合は localhost のみ許可（本番では必ず指定すること）。
+   */
+  corsOrigins?: string[];
+}
+
 export class HiraviStorageStack extends cdk.Stack {
   public readonly slideBucket: s3.Bucket;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: HiraviStorageStackProps) {
     super(scope, id, props);
+
+    const corsOrigins = props?.corsOrigins ?? ["http://localhost:3000"];
 
     // メインバケット: PDF 元ファイル + スライド画像
     this.slideBucket = new s3.Bucket(this, "HiraviSlideBucket", {
@@ -31,7 +42,7 @@ export class HiraviStorageStack extends cdk.Stack {
             s3.HttpMethods.PUT,
             s3.HttpMethods.POST,
           ],
-          allowedOrigins: ["http://localhost:3000", "https://*.vercel.app"],
+          allowedOrigins: corsOrigins,
           exposedHeaders: ["ETag"],
           maxAge: 3600,
         },

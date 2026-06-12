@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CATEGORIES, LANGUAGES, type LanguageCode } from '@/lib/data'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from '@/lib/upload-limits'
 import { cn } from '@/lib/utils'
 import { getPresignedUploadUrl, createDeckRecord, enqueueProcessing } from '@/app/actions/upload'
 
@@ -47,6 +48,10 @@ export default function UploadPage() {
       toast.error('Please upload a PDF file')
       return
     }
+    if (f.size > MAX_UPLOAD_BYTES) {
+      toast.error(`File is too large. Maximum size is ${MAX_UPLOAD_LABEL}.`)
+      return
+    }
     setFile(f)
     if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
   }
@@ -60,19 +65,23 @@ export default function UploadPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file) return toast.error('Add a PDF to upload')
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return toast.error(`File is too large. Maximum size is ${MAX_UPLOAD_LABEL}.`)
+    }
     if (!title.trim()) return toast.error('Give your deck a title')
     setSubmitting(true)
 
     try {
-      // 1. presigned URL を取得
-      const { url, key, deckId } = await getPresignedUploadUrl(file.name, file.type)
+      // 1. presigned POST を取得
+      const { url, fields, key, deckId } = await getPresignedUploadUrl(file.name, file.type)
 
-      // 2. S3 に直接アップロード
-      const uploadRes = await fetch(url, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      })
+      // 2. S3 に直接アップロード（multipart/form-data POST）
+      //    fields は presigned POST の署名・ポリシーを含む。file は必ず最後に append する。
+      const formData = new FormData()
+      Object.entries(fields).forEach(([k, v]) => formData.append(k, v as string))
+      formData.append('file', file)
+
+      const uploadRes = await fetch(url, { method: 'POST', body: formData })
       if (!uploadRes.ok) throw new Error(`S3 upload failed: ${uploadRes.status}`)
 
       // 3. DSQL にデッキレコードを登録
@@ -151,7 +160,7 @@ export default function UploadPage() {
                   Drag & drop your PDF here
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  or click to browse — up to 50 MB
+                  or click to browse — up to {MAX_UPLOAD_LABEL}
                 </span>
                 <input
                   ref={inputRef}
@@ -210,7 +219,7 @@ export default function UploadPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
                   <Label>Category</Label>
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select value={category} onValueChange={(v) => setCategory(v ?? 'tech')}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>

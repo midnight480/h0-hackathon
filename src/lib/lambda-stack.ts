@@ -43,7 +43,17 @@ export class HiraviLambdaStack extends cdk.Stack {
         runtime: lambda.Runtime.PYTHON_3_12,
         architecture: lambda.Architecture.X86_64,
         handler: "handler.main",
-        code: lambda.Code.fromAsset("lambda/processing"),
+        code: lambda.Code.fromAsset("lambda/processing", {
+          bundling: {
+            image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+            platform: "linux/amd64",
+            command: [
+              "bash",
+              "-c",
+              "pip install --no-cache-dir -r requirements.txt -t /asset-output && cp -R . /asset-output",
+            ],
+          },
+        }),
         layers: [ghostscriptLayer],
         // PDF 処理は重いのでメモリ・タイムアウトを大きめに
         memorySize: 2048,

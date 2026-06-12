@@ -6,6 +6,13 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/@(.*)",
+  "/s/(.*)",
+  "/privacy",
+  "/terms",
+  "/security",
+  "/monitoring(.*)", // Sentry トンネルルート
+  "/opengraph-image(.*)", // OGP 画像（SNS クローラがアクセス）
+  "/twitter-image(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
