@@ -12,6 +12,8 @@ const isPublicRoute = createRouteMatcher([
   "/security",
   "/monitoring(.*)", // Sentry トンネルルート
   "/sentry-example-page",
+  "/opengraph-image(.*)", // OGP 画像（SNS クローラがアクセス）
+  "/twitter-image(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
