@@ -6,6 +6,7 @@ import { Menu, Upload } from 'lucide-react'
 import { useAuth, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LocaleToggle } from '@/components/locale-toggle'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -13,22 +14,24 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useT } from '@/lib/i18n/locale-provider'
 import { cn } from '@/lib/utils'
 
 const NAV = [
-  { href: '/browse', label: 'Browse' },
-  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/browse', labelKey: 'nav.browse' },
+  { href: '/dashboard', labelKey: 'nav.dashboard' },
 ]
 
 export function SiteHeader() {
   const pathname = usePathname()
   const { isLoaded, isSignedIn } = useAuth()
+  const t = useT()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
-          <Link href="/" aria-label="Hiravi home">
+          <Link href="/" aria-label={t('nav.home')}>
             <Logo />
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
@@ -43,13 +46,14 @@ export function SiteHeader() {
                     : 'text-muted-foreground',
                 )}
               >
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             ))}
           </nav>
         </div>
 
         <div className="flex items-center gap-2">
+          <LocaleToggle />
           <ThemeToggle />
           {isLoaded && isSignedIn && (
             <>
@@ -61,7 +65,7 @@ export function SiteHeader() {
                 className="hidden sm:inline-flex"
               >
                 <Upload className="size-4" />
-                Upload
+                {t('nav.upload')}
               </Button>
               <UserButton />
             </>
@@ -69,10 +73,10 @@ export function SiteHeader() {
           {isLoaded && !isSignedIn && (
             <>
               <SignInButton mode="modal">
-                <Button variant="ghost" size="sm">Sign in</Button>
+                <Button variant="ghost" size="sm">{t('nav.signIn')}</Button>
               </SignInButton>
               <SignUpButton mode="modal">
-                <Button variant="default" size="sm">Sign up</Button>
+                <Button variant="default" size="sm">{t('nav.signUp')}</Button>
               </SignUpButton>
             </>
           )}
@@ -80,13 +84,13 @@ export function SiteHeader() {
           <Sheet>
             <SheetTrigger
               render={
-                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" />
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label={t('nav.openMenu')} />
               }
             >
               <Menu className="size-5" />
             </SheetTrigger>
             <SheetContent side="right" className="w-72">
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
+              <SheetTitle className="sr-only">{t('nav.navigation')}</SheetTitle>
               <div className="mt-8 flex flex-col gap-1 px-2">
                 {NAV.map((item) => (
                   <Link
@@ -94,7 +98,7 @@ export function SiteHeader() {
                     href={item.href}
                     className="rounded-md px-3 py-2.5 text-base font-medium text-foreground hover:bg-muted"
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 ))}
                 <Link
@@ -102,7 +106,7 @@ export function SiteHeader() {
                   className="mt-2 flex items-center gap-2 rounded-md bg-primary px-3 py-2.5 text-base font-medium text-primary-foreground"
                 >
                   <Upload className="size-4" />
-                  Upload a deck
+                  {t('nav.uploadDeck')}
                 </Link>
               </div>
             </SheetContent>

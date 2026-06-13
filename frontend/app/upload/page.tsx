@@ -26,11 +26,13 @@ import {
 } from '@/components/ui/select'
 import { CATEGORIES, LANGUAGES, type LanguageCode } from '@/lib/data'
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from '@/lib/upload-limits'
+import { useT } from '@/lib/i18n/locale-provider'
 import { cn } from '@/lib/utils'
 import { getPresignedUploadUrl, createDeckRecord, enqueueProcessing } from '@/app/actions/upload'
 
 export default function UploadPage() {
   const router = useRouter()
+  const t = useT()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -45,11 +47,11 @@ export default function UploadPage() {
     const f = files?.[0]
     if (!f) return
     if (f.type !== 'application/pdf') {
-      toast.error('Please upload a PDF file')
+      toast.error(t('upload.toastNotPdf'))
       return
     }
     if (f.size > MAX_UPLOAD_BYTES) {
-      toast.error(`File is too large. Maximum size is ${MAX_UPLOAD_LABEL}.`)
+      toast.error(t('upload.toastTooLarge', { limit: MAX_UPLOAD_LABEL }))
       return
     }
     setFile(f)
@@ -64,11 +66,11 @@ export default function UploadPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return toast.error('Add a PDF to upload')
+    if (!file) return toast.error(t('upload.toastAddPdf'))
     if (file.size > MAX_UPLOAD_BYTES) {
-      return toast.error(`File is too large. Maximum size is ${MAX_UPLOAD_LABEL}.`)
+      return toast.error(t('upload.toastTooLarge', { limit: MAX_UPLOAD_LABEL }))
     }
-    if (!title.trim()) return toast.error('Give your deck a title')
+    if (!title.trim()) return toast.error(t('upload.toastNeedTitle'))
     setSubmitting(true)
 
     try {
@@ -106,11 +108,11 @@ export default function UploadPage() {
         originalLanguage: original,
       })
 
-      toast.success('Deck uploaded — translation in progress')
+      toast.success(t('upload.toastSuccess'))
       router.push('/dashboard')
     } catch (err) {
       console.error(err)
-      toast.error('Upload failed. Please try again.')
+      toast.error(t('upload.toastFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -123,10 +125,10 @@ export default function UploadPage() {
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="mb-8">
             <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
-              Upload a deck
+              {t('upload.title')}
             </h1>
             <p className="mt-1 text-muted-foreground">
-              Drop in a PDF and choose which languages to translate it into.
+              {t('upload.subtitle')}
             </p>
           </div>
 
@@ -157,10 +159,10 @@ export default function UploadPage() {
                   <UploadCloud className="size-7" />
                 </span>
                 <span className="font-heading text-lg font-semibold text-foreground">
-                  Drag & drop your PDF here
+                  {t('upload.dropTitle')}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  or click to browse — up to {MAX_UPLOAD_LABEL}
+                  {t('upload.dropHint', { limit: MAX_UPLOAD_LABEL })}
                 </span>
                 <input
                   ref={inputRef}
@@ -186,7 +188,7 @@ export default function UploadPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setFile(null)}
-                  aria-label="Remove file"
+                  aria-label={t('upload.removeFile')}
                 >
                   <X className="size-4" />
                 </Button>
@@ -196,29 +198,29 @@ export default function UploadPage() {
             {/* Metadata */}
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="title">{t('upload.fieldTitle')}</Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Designing for Aurora DSQL at Global Scale"
+                  placeholder={t('upload.titlePlaceholder')}
                 />
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">{t('upload.fieldDescription')}</Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What is this talk about?"
+                  placeholder={t('upload.descriptionPlaceholder')}
                   rows={3}
                 />
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
-                  <Label>Category</Label>
+                  <Label>{t('upload.fieldCategory')}</Label>
                   <Select value={category} onValueChange={(v) => setCategory(v ?? 'tech')}>
                     <SelectTrigger>
                       <SelectValue />
@@ -226,7 +228,7 @@ export default function UploadPage() {
                     <SelectContent>
                       {CATEGORIES.filter((c) => c.value !== 'all').map((c) => (
                         <SelectItem key={c.value} value={c.value}>
-                          {c.label}
+                          {t(`categories.${c.value}`)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -234,7 +236,7 @@ export default function UploadPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label>Original language</Label>
+                  <Label>{t('upload.fieldOriginal')}</Label>
                   <Select
                     value={original}
                     onValueChange={(v) => setOriginal(v as LanguageCode)}
@@ -257,7 +259,7 @@ export default function UploadPage() {
               <div className="flex flex-col gap-2">
                 <Label className="flex items-center gap-2">
                   <Globe className="size-4 text-accent" />
-                  Translate into
+                  {t('upload.translateInto')}
                 </Label>
                 <div className="flex flex-wrap gap-2">
                   {LANGUAGES.filter((l) => l.code !== original).map((l) => {
@@ -281,18 +283,23 @@ export default function UploadPage() {
                   })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {targets.length} target {targets.length === 1 ? 'language' : 'languages'} selected
+                  {t(
+                    targets.length === 1
+                      ? 'upload.targetsSelected'
+                      : 'upload.targetsSelectedPlural',
+                    { count: targets.length },
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
               <Button type="button" variant="ghost" onClick={() => router.push('/dashboard')}>
-                Cancel
+                {t('upload.cancel')}
               </Button>
               <Button type="submit" disabled={submitting} className="gap-2">
                 {submitting && <Loader2 className="size-4 animate-spin" />}
-                {submitting ? 'Uploading…' : 'Upload & translate'}
+                {submitting ? t('upload.submitting') : t('upload.submit')}
               </Button>
             </div>
           </form>

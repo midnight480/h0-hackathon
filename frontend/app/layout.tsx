@@ -7,6 +7,8 @@ import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
 import Script from 'next/script'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { LocaleProvider } from '@/lib/i18n/locale-provider'
+import { getServerI18n } from '@/lib/i18n'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -43,14 +45,17 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Cookie から UI ロケールを解決し、対応する辞書のみをクライアントへ渡す。
+  const { locale, dictionary } = await getServerI18n()
+
   return (
     <html
-      lang="en"
+      lang={locale}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} bg-background`}
     >
@@ -63,10 +68,12 @@ export default function RootLayout({
           }}
         />
         <ClerkProvider appearance={{ theme: shadcn }}>
-          <ThemeProvider>
-            <div className="flex min-h-screen flex-col">{children}</div>
-            <Toaster position="bottom-right" />
-          </ThemeProvider>
+          <LocaleProvider locale={locale} dictionary={dictionary}>
+            <ThemeProvider>
+              <div className="flex min-h-screen flex-col">{children}</div>
+              <Toaster position="bottom-right" />
+            </ThemeProvider>
+          </LocaleProvider>
           <Analytics />
           <SpeedInsights />
         </ClerkProvider>

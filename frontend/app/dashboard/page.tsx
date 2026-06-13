@@ -18,6 +18,8 @@ import { DeckDeleteButton } from '@/components/deck-delete-button'
 import { DeckVisibilityToggle } from '@/components/deck-visibility-toggle'
 import { withDb } from '@/lib/db'
 import { type ProcessingStatus, formatCount, languageLabel } from '@/lib/data'
+import { getServerI18n } from '@/lib/i18n'
+import type { TFunc } from '@/lib/i18n/translate'
 import { cn } from '@/lib/utils'
 
 interface DeckRow {
@@ -37,31 +39,31 @@ interface DeckRow {
 
 const STATUS: Record<
   ProcessingStatus,
-  { label: string; icon: typeof CheckCircle2; className: string }
+  { labelKey: string; icon: typeof CheckCircle2; className: string }
 > = {
   ready: {
-    label: 'Published',
+    labelKey: 'dashboard.statusReady',
     icon: CheckCircle2,
     className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   },
   processing: {
-    label: 'Translating',
+    labelKey: 'dashboard.statusProcessing',
     icon: Loader2,
     className: 'bg-accent/10 text-accent',
   },
   pending: {
-    label: 'Queued',
+    labelKey: 'dashboard.statusPending',
     icon: Clock,
     className: 'bg-muted text-muted-foreground',
   },
   failed: {
-    label: 'Failed',
+    labelKey: 'dashboard.statusFailed',
     icon: AlertTriangle,
     className: 'bg-destructive/10 text-destructive',
   },
 }
 
-function StatusBadge({ status }: { status: ProcessingStatus }) {
+function StatusBadge({ status, t }: { status: ProcessingStatus; t: TFunc }) {
   const s = STATUS[status]
   const Icon = s.icon
   return (
@@ -72,12 +74,12 @@ function StatusBadge({ status }: { status: ProcessingStatus }) {
       )}
     >
       <Icon className={cn('size-3.5', status === 'processing' && 'animate-spin')} />
-      {s.label}
+      {t(s.labelKey)}
     </span>
   )
 }
 
-function DashRow({ deck, username, userId }: { deck: DeckRow; username: string; userId: string }) {
+function DashRow({ deck, username, t }: { deck: DeckRow; username: string; t: TFunc }) {
   const ready = deck.status === 'ready'
   const region = process.env.NEXT_PUBLIC_AWS_REGION ?? 'us-east-1'
   const coverUrl = deck.cover_image_key
@@ -96,7 +98,7 @@ function DashRow({ deck, username, userId }: { deck: DeckRow; username: string; 
       </div>
       <div className="min-w-0 flex-1">
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
-          <StatusBadge status={deck.status} />
+          <StatusBadge status={deck.status} t={t} />
           <Badge variant="outline" className="text-[10px]">
             {languageLabel(deck.original_language as any)} →{' '}
             {deck.target_languages.slice(0, 4).map((l) => languageLabel(l as any)).join(', ')}
@@ -109,7 +111,7 @@ function DashRow({ deck, username, userId }: { deck: DeckRow; username: string; 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Layers className="size-3.5" />
-            {deck.slide_count} slides
+            {t('dashboard.slidesCount', { count: deck.slide_count })}
           </span>
           <span className="flex items-center gap-1">
             <Heart className="size-3.5" />
@@ -126,7 +128,7 @@ function DashRow({ deck, username, userId }: { deck: DeckRow; username: string; 
       <div className="flex shrink-0 items-center gap-2">
         {deck.status === 'failed' && (
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
-            Retry
+            {t('dashboard.retry')}
           </Button>
         )}
         {deck.status === 'ready' && (
@@ -153,6 +155,8 @@ export default async function DashboardPage() {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
+  const { t } = await getServerI18n()
+
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<DeckRow>(
       `SELECT id, slug, title, original_language, target_languages,
@@ -175,10 +179,10 @@ export default async function DashboardPage() {
   const totalLikes = published.reduce((s, d) => s + d.likes, 0)
 
   const stats = [
-    { label: 'Decks', value: `${decks.length}` },
-    { label: 'Total reads', value: formatCount(totalViews) },
-    { label: 'Total likes', value: formatCount(totalLikes) },
-    { label: 'Languages', value: `${new Set(decks.flatMap((d) => d.target_languages)).size}` },
+    { label: t('dashboard.statDecks'), value: `${decks.length}` },
+    { label: t('dashboard.statReads'), value: formatCount(totalViews) },
+    { label: t('dashboard.statLikes'), value: formatCount(totalLikes) },
+    { label: t('dashboard.statLanguages'), value: `${new Set(decks.flatMap((d) => d.target_languages)).size}` },
   ]
 
   return (
@@ -188,12 +192,12 @@ export default async function DashboardPage() {
         <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Your decks
+              {t('dashboard.title')}
             </h1>
             <Button asChild>
               <Link href="/upload" className="gap-2">
                 <Plus className="size-4" />
-                New deck
+                {t('dashboard.newDeck')}
               </Link>
             </Button>
           </div>
@@ -213,24 +217,24 @@ export default async function DashboardPage() {
 
           <div className="mt-10">
             <h2 className="mb-4 font-heading text-xl font-bold tracking-tight text-foreground">
-              Your decks
+              {t('dashboard.sectionTitle')}
             </h2>
             {decks.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20 text-center">
                 <p className="font-heading text-lg font-semibold text-foreground">
-                  No decks yet
+                  {t('dashboard.emptyTitle')}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Upload your first PDF to get started.
+                  {t('dashboard.emptyBody')}
                 </p>
                 <Button asChild className="mt-4">
-                  <Link href="/upload">Upload a deck</Link>
+                  <Link href="/upload">{t('dashboard.emptyAction')}</Link>
                 </Button>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {decks.map((deck) => (
-                  <DashRow key={deck.id} deck={deck} username={userId} userId={userId} />
+                  <DashRow key={deck.id} deck={deck} username={userId} t={t} />
                 ))}
               </div>
             )}
