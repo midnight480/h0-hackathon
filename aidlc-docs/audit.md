@@ -86,3 +86,43 @@
 **Context**: Construction - slug-identifier unit. Functional Design 承認 → Code Generation / Build and Test 完了。
 
 ---
+
+## Operations - DSQL 本番移行の実行
+**Timestamp**: 2026-06-13T11:00:00Z
+**User Input**: "Mainにマージしました。最新の認証情報はこちらです。（一時STSクレデンシャル）" / "デプロイは３分前に完了しています"
+**AI Response**: main マージ＆Vercelデプロイ完了（新アプリ稼働）を確認後、Aurora DSQL（us-east-1, ...hrg3ra.dsql.us-east-1.on.aws）に対し本番移行を実行。順序: ① `pnpm/npm run db:migrate-public-id`（`ALTER TABLE decks ADD COLUMN IF NOT EXISTS legacy_slug` ＋ 既存4件の slug を正規形IDへ移行、legacy_slug へ旧値退避、short_id 温存）→ ② `npm run db:schema`（`idx_decks_legacy_slug` 含むインデックス作成、CREATE TABLE/ALTER は冪等no-op）。結果検証: 総デッキ4件、正規形slug 4/4、legacy_slug=NULL 0件、short_id 温存。例 `juavoudnpj`←`amazon-s3-grants-20231216-75709208`。一時検証スクリプトは実行後に削除。コミット対象の副次変更なし（package-lock 不変）。
+**Context**: Operations - 本番 DSQL スキーマ変更（legacy_slug列+index）とデータ移行を正常完了。認証情報は一時STS（要ローテーション）。
+
+---
+
+## Requirements Analysis - URLのuser部分をusernameへ（新要件）
+**Timestamp**: 2026-06-13T11:30:00Z
+**User Input**: "user だと、Clerkが保持している"@user_3F2LMRBIgGEr4B9Q26bM2837ayd" と長いので、Clerkで新たに username をサインアップ時に要求するようにしました。要件を整理してください"
+**AI Response**: 新要件（Enhancement）として受領。URL `/@{user}/{slug}` の `{user}` を Clerk user_id から username へ置換。現状調査: ルーティングは user_id 直接照合（page.tsx:55）、decks に username カラム無し・users テーブル無し、username は Clerk API 都度取得（lib/clerk-users.ts）、Clerk webhook 未実装、コンポーネントは author.username 参照だが中身は user_id（page.tsx:53-54）。要件整理のため、解決戦略（ライブ解決 vs DB非正規化+webhook）/ username変更時の挙動 / username未設定ユーザーのフォールバック / 旧user_id URLのリダイレクト要否を確認する。
+**Context**: Construction/Operations 後の新規 Enhancement。slug-identifier 機能に続く識別子改善（username 化）。Requirements Analysis 開始。
+
+---
+
+## Requirements Analysis - Clerk設定の確認と前提条件の解消
+**Timestamp**: 2026-06-13T11:45:00Z
+**User Input**: "ClerkでUsernameを新たに追加したが、アカウント管理画面に username が降ってきていないので進めていいか不明"（スクショ2枚）/ "Clerkの管理画面で割り当てたら、見えるようになりました Username から midnight480"（スクショ1枚）
+**AI Response**: Clerk設定スクショから判明: Sign-up with username=ON, Require username=ON, **Restrict changes=ON（サインアップ後の username 変更を禁止）**, Sign-in with username=ON, min6/max64, numeric off, extended off。「Require username は新規サインアップのみ適用・既存ユーザーは遡及付与されない」ため既存アカウントは username 空だったと説明。管理者が Dashboard で付与する方針を提示 → ユーザーが既存アカウント（Tetsuya Shibao = 既存4デッキ所有者 user_3F2L...）に `midnight480` を付与し Account 画面に表示されることを確認（バックフィル方式の有効性を実証）。重要な設計含意: **Restrict changes=ON により username は実質不変 → 「username変更時の旧URLリダイレクト/履歴保持」要件が不要となり設計が単純化。webhook(user.updated) による同期も不要化**。
+**Context**: Requirements Analysis - 前提条件（既存ユーザーへの username 付与）を解消。username immutable の判明により論点を簡素化。残論点: 解決方式(ライブ vs 非正規化)/旧user_id URLの扱い/フォールバック。
+
+---
+
+## Requirements Analysis - username化 論点確定・要件定義
+**Timestamp**: 2026-06-13T12:00:00Z
+**User Input**: "（AskUserQuestion 回答）Q1=DB非正規化 / Q2=旧user_id URLはusername形式へ301 / Q3=安全フォールバック実装する"
+**AI Response**: 3論点を確定し要件定義書 `aidlc-docs/inception/requirements/username-routing-requirements.md` を作成。決定: decks に username 列を非正規化追加（作成時保存＋既存バックフィル、username で直接検索しClerk呼ばず）、username不変のため同期不要、旧 user_id URL は `user_` 判定で username 形式へ301、username空は user_id フォールバック。影響範囲: schema.sql / upload.ts / [user]/[slug]/page.tsx / s/[code]/route.ts / 一覧・カード・viewer の author 表示 / 新規バックフィルスクリプト。
+**Context**: Requirements Analysis 完了（username-routing）。次: Workflow Planning（または Functional Design）。承認待ち。
+
+---
+
+## Requirements Analysis - 承認 → ドキュメントコミット & Web実装ハンドオフ
+**Timestamp**: 2026-06-13T12:10:00Z
+**User Input**: "要件定義書関連をMainにGit Commit, pushして、Claude Code Webで実装作業が続けられるようなプロンプトをください"
+**AI Response**: username-routing 要件を承認として受領。aidlc-docs（username-routing-requirements.md 新規、audit.md / aidlc-state.md 更新）を main にコミット&プッシュ。実装は Claude Code Web へハンドオフするための自己完結プロンプトを提供（スキーマ追加→作成時保存→ルーティング解決/301→表示置換→バックフィルスクリプトの順、確定済み設計に準拠）。DSQL バックフィル（username 設定, 要 Clerk Secret）はマージ後に本セッションで実行予定。
+**Context**: username-routing 要件承認。Workflow Planning/Functional Design は Web 側の実装に内包しハンドオフ。
+
+---

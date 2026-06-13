@@ -3,8 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION - slug-identifier ユニット（Code Generation / Build and Test 完了）
-- **Active Feature**: 公開識別子の Google Meet 形式ランダムID化（カスタム入力なし・一本化）
+- **Current Stage**: INCEPTION - Requirements Analysis 完了（username-routing 機能・承認待ち）
+- **Active Feature**: 公開URLの user 部分を Clerk username 化（DB非正規化・旧user_id URLは301・フォールバックあり）
+- **Completed Feature**: 公開識別子の Google Meet 形式ランダムID化（slug-identifier・実装＋本番DSQL移行 完了）
 
 ## Workspace State
 - **Existing Code**: Yes
