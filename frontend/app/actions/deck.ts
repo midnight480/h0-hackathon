@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { randomUUID } from 'crypto'
 import { withDb } from '@/lib/db'
+import { assertUuid } from '@/lib/validation'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 
@@ -97,6 +98,7 @@ async function resolveLikerId(allowCreate: boolean): Promise<string | null> {
 }
 
 export async function likeDeck(deckId: string): Promise<{ alreadyLiked: boolean }> {
+  assertUuid(deckId, 'deckId')
   const likerId = await resolveLikerId(true)
   if (!likerId) throw new Error('Could not resolve liker')
 
@@ -109,8 +111,12 @@ export async function likeDeck(deckId: string): Promise<{ alreadyLiked: boolean 
           `INSERT INTO deck_likes (deck_id, liker_id) VALUES ($1, $2)`,
           [deckId, likerId],
         )
+        // 非公開デッキへのいいねは不可。UPDATE が 0 行なら ROLLBACK され
+        // deck_likes への INSERT も巻き戻る。
         const { rowCount } = await client.query(
-          `UPDATE decks SET likes = likes + 1 WHERE id = $1 AND deleted_at IS NULL`,
+          `UPDATE decks SET likes = likes + 1
+           WHERE id = $1 AND deleted_at IS NULL
+             AND (is_public = true OR is_public IS NULL)`,
           [deckId],
         )
         if (!rowCount) throw new Error('Deck not found')

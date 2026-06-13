@@ -100,12 +100,7 @@ export default function UploadPage() {
       // 4. SQS に処理ジョブを登録
       await enqueueProcessing({
         deckId,
-        fileKey: key,
         targetLanguages: targets,
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        originalLanguage: original,
       })
 
       toast.success(t('upload.toastSuccess'))

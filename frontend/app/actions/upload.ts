@@ -7,6 +7,7 @@ import { auth } from '@clerk/nextjs/server'
 import { randomUUID, randomBytes } from 'crypto'
 import { withDb } from '@/lib/db'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
+import { assertUuid, validateDeckMetadata, validateTargetLanguages } from '@/lib/validation'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 const sqs = new SQSClient({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -79,13 +80,17 @@ export async function createDeckRecord(params: {
   const { userId } = await auth()
   if (!userId) throw new Error('Unauthorized')
 
+  // クライアント入力をサーバー側で検証・正規化する（UI を経由しない直接呼び出し対策）。
+  const deckId = assertUuid(params.deckId, 'deckId')
+  const meta = validateDeckMetadata(params)
+
   // fileKey は getPresignedUploadUrl が発行した `uploads/{deckId}/...` 形式のみ許可。
   // 他人の fileKey を指定して自分のデッキとして登録する攻撃を防ぐ。
-  if (!params.fileKey.startsWith(`uploads/${params.deckId}/`)) {
+  if (typeof params.fileKey !== 'string' || !params.fileKey.startsWith(`uploads/${deckId}/`)) {
     throw new Error('Invalid file key')
   }
 
-  const slug = toSlug(params.title, params.deckId)
+  const slug = toSlug(meta.title, deckId)
   const shortId = generateShortId()
 
   await withDb(async (client) => {
@@ -95,15 +100,15 @@ export async function createDeckRecord(params: {
          original_language, target_languages, file_key, status, is_public)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', false)`,
       [
-        params.deckId,
+        deckId,
         slug,
         shortId,
-        params.title,
-        params.description,
+        meta.title,
+        meta.description,
         userId,
-        params.category,
-        params.originalLanguage,
-        JSON.stringify(params.targetLanguages),
+        meta.category,
+        meta.originalLanguage,
+        JSON.stringify(meta.targetLanguages),
         params.fileKey,
       ],
     )
@@ -114,15 +119,15 @@ export async function createDeckRecord(params: {
 
 export async function enqueueProcessing(params: {
   deckId: string
-  fileKey: string
   targetLanguages: string[]
-  title: string
-  description: string
-  category: string
-  originalLanguage: string
 }) {
   const { userId } = await auth()
   if (!userId) throw new Error('Unauthorized')
+
+  // クライアント入力を検証・正規化する。targetLanguages の件数上限は
+  // Amazon Translate の呼び出し増幅（コスト/DoS）を防ぐために重要。
+  const deckId = assertUuid(params.deckId, 'deckId')
+  const targetLanguages = validateTargetLanguages(params.targetLanguages)
 
   // この deck が呼び出しユーザーの所有であることを検証し、
   // SQS に渡す file_key は DB に保存済みの値を使う（クライアント値を信頼しない）。
@@ -130,7 +135,7 @@ export async function enqueueProcessing(params: {
     const { rows } = await client.query<{ file_key: string | null }>(
       `SELECT file_key FROM decks
        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
-      [params.deckId, userId],
+      [deckId, userId],
     )
     if (rows.length === 0) throw new Error('Deck not found or unauthorized')
     return rows[0].file_key
@@ -140,13 +145,9 @@ export async function enqueueProcessing(params: {
     new SendMessageCommand({
       QueueUrl: process.env.SQS_QUEUE_URL,
       MessageBody: JSON.stringify({
-        deck_id: params.deckId,
+        deck_id: deckId,
         file_key: fileKey,
-        target_languages: params.targetLanguages,
-        title: params.title,
-        description: params.description,
-        category: params.category,
-        original_language: params.originalLanguage,
+        target_languages: targetLanguages,
       }),
     }),
   )
