@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { auth, clerkClient } from '@clerk/nextjs/server'
+import { normalizePublicId, isCanonicalId, formatPublicId } from '@/lib/public-id'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { DeckViewer } from '@/components/deck-viewer'
@@ -125,6 +126,27 @@ async function getDeckFromDb(
   }
 }
 
+// レガシー slug（旧タイトル由来URL）から現在の正規形 slug を引く。
+// 見つかれば新URLへリダイレクトするために使用する。
+async function getCanonicalSlugByLegacy(
+  userId: string,
+  legacySlug: string,
+): Promise<string | null> {
+  try {
+    return await withDb(async (client) => {
+      const { rows } = await client.query<{ slug: string }>(
+        `SELECT slug FROM decks
+         WHERE user_id = $1 AND legacy_slug = $2 AND deleted_at IS NULL
+         LIMIT 1`,
+        [userId, legacySlug],
+      )
+      return rows[0]?.slug ?? null
+    })
+  } catch {
+    return null
+  }
+}
+
 async function fetchRelated(deckId: string, category: string): Promise<Deck[]> {
   try {
     const rows = await withDb(async (client) => {
@@ -182,9 +204,23 @@ export default async function DeckPage({
 
   const { userId: viewerId } = await auth()
   const authorInfo = await getAuthorInfo(username)
-  const deck: Deck | null = await getDeckFromDb(username, slug, viewerId, authorInfo)
 
-  if (!deck) notFound()
+  // 公開識別子を正規化（ハイフン除去・小文字化）。正規形なら slug で検索する。
+  // 例: `abc-defg-hij` も `abcdefghij` も同一デッキに解決する。
+  const normalized = normalizePublicId(slug)
+  let deck: Deck | null = null
+  if (isCanonicalId(normalized)) {
+    deck = await getDeckFromDb(username, normalized, viewerId, authorInfo)
+  }
+
+  // 未ヒット時はレガシー slug（旧タイトルURL）として検索し、新URLへリダイレクト（301相当）。
+  if (!deck) {
+    const canonical = await getCanonicalSlugByLegacy(username, slug)
+    if (canonical) {
+      redirect(`/@${username}/${formatPublicId(canonical)}`)
+    }
+    notFound()
+  }
 
   // スライドがまだない（pending/processing/failed）場合は処理中ページを表示
   if (deck.slides.length === 0) {

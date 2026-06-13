@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { auth } from '@clerk/nextjs/server'
 import { withDb } from '@/lib/db'
+import { formatPublicId } from '@/lib/public-id'
 
 export async function GET(
   _req: Request,
@@ -24,5 +25,6 @@ export async function GET(
   // 非公開デッキは所有者のみ
   if (row.is_public === false && viewerId !== row.user_id) notFound()
 
-  redirect(`/@${row.user_id}/${row.slug}`)
+  // レガシー短縮URL（/s/{code}）は新URL形式（公開識別子の表示形 3-4-3）へリダイレクト。
+  redirect(`/@${row.user_id}/${formatPublicId(row.slug)}`)
 }

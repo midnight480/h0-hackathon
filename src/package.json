@@ -8,7 +8,9 @@
     "build": "tsc",
     "watch": "tsc -w",
     "cdk": "cdk",
-    "synth": "cdk synth"
+    "synth": "cdk synth",
+    "db:schema": "tsx scripts/apply-schema.ts",
+    "db:migrate-public-id": "tsx scripts/migrate-public-id.ts"
   },
   "devDependencies": {
     "@aws-sdk/dsql-signer": "^3.1065.0",
@@ -21,6 +23,7 @@
   },
   "dependencies": {
     "aws-cdk-lib": "2.257.0",
-    "constructs": "10.5.0"
+    "constructs": "10.5.0",
+    "nanoid": "^5.1.11"
   }
 }

@@ -3,7 +3,10 @@
 
 CREATE TABLE IF NOT EXISTS decks (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- slug: 公開識別子の正規形（Google Meet 形式・小文字英字10文字 `^[a-z]{10}$`）。UNIQUE を維持。
     slug          TEXT        NOT NULL UNIQUE,
+    -- legacy_slug: 移行前の旧 slug（タイトル由来）を保持。旧URLリダイレクト用。
+    legacy_slug   TEXT,
     title         TEXT        NOT NULL,
     description   TEXT        NOT NULL DEFAULT '',
     user_id       TEXT        NOT NULL,
@@ -18,12 +21,16 @@ CREATE TABLE IF NOT EXISTS decks (
     file_key      TEXT,
     cover_image_key TEXT,
     is_public     BOOLEAN,
+    -- short_id: 旧URL（/s/{code}）リダイレクト専用に流用。新規採番は行わない。
     short_id      VARCHAR(8),
     published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at    TIMESTAMPTZ
 );
+
+-- 既存テーブルへのべき等な列追加（apply-schema による再適用を想定）。
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS legacy_slug TEXT;
 
 CREATE TABLE IF NOT EXISTS slides (
     id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,3 +62,5 @@ CREATE INDEX ASYNC IF NOT EXISTS idx_decks_category  ON decks (category);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slides_deck_id  ON slides (deck_id, page_number);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slide_texts_slide_id ON slide_texts (slide_id, language_code);
 CREATE INDEX ASYNC IF NOT EXISTS idx_deck_likes_deck_id ON deck_likes (deck_id);
+-- 旧URLリダイレクト（legacy_slug 一致）検索用インデックス。
+CREATE INDEX ASYNC IF NOT EXISTS idx_decks_legacy_slug ON decks (legacy_slug);
