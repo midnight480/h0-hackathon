@@ -15,11 +15,11 @@ async function fetchFeatured(): Promise<{ decks: Deck[]; totalDecks: number; tot
     const { rows, totalDecks, totalLikes } = await withDb(async (client) => {
       const { rows } = await client.query<{
         id: string; slug: string; title: string; description: string
-        user_id: string; category: string; original_language: string
+        user_id: string; username: string | null; category: string; original_language: string
         target_languages: string[] | string; slide_count: number
         views: number; likes: number; cover_image_key: string | null; published_at: string
       }>(
-        `SELECT id, slug, title, description, user_id, category, original_language,
+        `SELECT id, slug, title, description, user_id, username, category, original_language,
                 target_languages, slide_count, views, likes, cover_image_key, published_at
          FROM decks
          WHERE status = 'ready'
@@ -51,7 +51,7 @@ async function fetchFeatured(): Promise<{ decks: Deck[]; totalDecks: number; tot
         : JSON.parse(r.target_languages as string)
       return {
         id: r.id, slug: r.slug, title: r.title, description: r.description,
-        author: { username: r.user_id, name: author.name, avatarUrl: author.avatarUrl },
+        author: { username: r.username ?? r.user_id, name: author.name, avatarUrl: author.avatarUrl },
         category: r.category as Deck['category'],
         tags: [],
         originalLanguage: r.original_language as LanguageCode,

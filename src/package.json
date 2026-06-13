@@ -10,7 +10,8 @@
     "cdk": "cdk",
     "synth": "cdk synth",
     "db:schema": "tsx scripts/apply-schema.ts",
-    "db:migrate-public-id": "tsx scripts/migrate-public-id.ts"
+    "db:migrate-public-id": "tsx scripts/migrate-public-id.ts",
+    "db:backfill-username": "tsx scripts/backfill-username.ts"
   },
   "devDependencies": {
     "@aws-sdk/dsql-signer": "^3.1065.0",
