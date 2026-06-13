@@ -4,9 +4,10 @@ import { S3Client } from '@aws-sdk/client-s3'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
 import { auth } from '@clerk/nextjs/server'
-import { randomUUID, randomBytes } from 'crypto'
+import { randomUUID } from 'crypto'
 import { withDb } from '@/lib/db'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
+import { generatePublicId, formatPublicId } from '@/lib/public-id'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 const sqs = new SQSClient({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -53,19 +54,18 @@ export async function getPresignedUploadUrl(filename: string, contentType: strin
   return { url, fields, key, deckId }
 }
 
-function generateShortId(): string {
-  return randomBytes(4).toString('hex') // 8文字の16進数
+// 採番リトライ対象のDBエラー（UNIQUE違反 / OCC コンフリクト）を判定する。
+// pg はエラーに SQLSTATE を `code` として持つ。
+//   23505: unique_violation（slug の UNIQUE 衝突）
+//   40001: serialization_failure（DSQL の楽観的同時実行制御コンフリクト）
+//   OC000/OC001: DSQL 固有の OCC コンフリクトコード
+function isRetryableDeckInsertError(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code
+  if (!code) return false
+  return code === '23505' || code === '40001' || code.startsWith('OC')
 }
 
-function toSlug(title: string, deckId: string): string {
-  const base = title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .slice(0, 60)
-  return `${base}-${deckId.slice(0, 8)}`
-}
+const MAX_DECK_ID_RETRIES = 5
 
 export async function createDeckRecord(params: {
   deckId: string
@@ -85,31 +85,44 @@ export async function createDeckRecord(params: {
     throw new Error('Invalid file key')
   }
 
-  const slug = toSlug(params.title, params.deckId)
-  const shortId = generateShortId()
+  // 公開識別子（正規形10文字）を採番。UNIQUE/OCC 衝突時は新IDで再試行する。
+  // short_id は新規採番せず NULL（旧URLリダイレクト専用列）。legacy_slug も新規は NULL。
+  let lastErr: unknown
+  for (let attempt = 0; attempt < MAX_DECK_ID_RETRIES; attempt++) {
+    const publicId = generatePublicId()
+    try {
+      await withDb(async (client) => {
+        await client.query(
+          `INSERT INTO decks
+            (id, slug, legacy_slug, short_id, title, description, user_id, category,
+             original_language, target_languages, file_key, status, is_public)
+           VALUES ($1, $2, NULL, NULL, $3, $4, $5, $6, $7, $8, $9, 'pending', false)`,
+          [
+            params.deckId,
+            publicId,
+            params.title,
+            params.description,
+            userId,
+            params.category,
+            params.originalLanguage,
+            JSON.stringify(params.targetLanguages),
+            params.fileKey,
+          ],
+        )
+      })
+      // 保存は正規形、戻り値には表示形（3-4-3）も含めて呼び出し側で利用できるようにする。
+      return { slug: publicId, displaySlug: formatPublicId(publicId) }
+    } catch (err) {
+      lastErr = err
+      if (!isRetryableDeckInsertError(err)) throw err
+      // リトライ対象（衝突）の場合は新IDで再試行
+    }
+  }
 
-  await withDb(async (client) => {
-    await client.query(
-      `INSERT INTO decks
-        (id, slug, short_id, title, description, user_id, category,
-         original_language, target_languages, file_key, status, is_public)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', false)`,
-      [
-        params.deckId,
-        slug,
-        shortId,
-        params.title,
-        params.description,
-        userId,
-        params.category,
-        params.originalLanguage,
-        JSON.stringify(params.targetLanguages),
-        params.fileKey,
-      ],
-    )
-  })
-
-  return { slug }
+  throw new Error(
+    `公開識別子の採番に失敗しました（${MAX_DECK_ID_RETRIES}回リトライ後）`,
+    { cause: lastErr },
+  )
 }
 
 export async function enqueueProcessing(params: {

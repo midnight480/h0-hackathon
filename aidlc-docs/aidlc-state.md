@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: INCEPTION - Workflow Planning Complete → Construction (Functional Design 承認待ち)
+- **Current Stage**: CONSTRUCTION - slug-identifier ユニット（Code Generation / Build and Test 完了）
 - **Active Feature**: 公開識別子の Google Meet 形式ランダムID化（カスタム入力なし・一本化）
 
 ## Workspace State
@@ -33,15 +33,21 @@
 - **Risk Level**: Medium
 - **Next Stage**: Construction - Functional Design
 
-## Construction Stage Progress
+## Construction Stage Progress — slug-identifier ユニット
 | Phase | Stage | Status |
 |-------|-------|--------|
-| CONSTRUCTION | Functional Design | 承認待ち (成果物生成済) |
+| CONSTRUCTION | Functional Design | [x] Completed（成果物4点・承認済） |
 | CONSTRUCTION | NFR Requirements | [-] Skip |
 | CONSTRUCTION | NFR Design | [-] Skip |
 | CONSTRUCTION | Infrastructure Design | [-] Skip |
-| CONSTRUCTION | Code Generation | Pending (EXECUTE) |
-| CONSTRUCTION | Build and Test | Pending (EXECUTE) |
+| CONSTRUCTION | Code Generation | [x] Completed |
+| CONSTRUCTION | Build and Test | [x] Completed |
+
+### 実装サマリ（slug-identifier）
+- 公開識別子を Google Meet 形式（小文字英字10文字・表示 3-4-3）のランダムID（NanoID）へ一本化。
+- 変更ファイル: `frontend/lib/public-id.ts`（新規）, `frontend/lib/public-id.test.ts`（新規）, `src/schema/schema.sql`, `frontend/app/actions/upload.ts`, `frontend/app/[user]/[slug]/page.tsx`, `frontend/app/s/[code]/route.ts`, `src/scripts/migrate-public-id.ts`（新規）。
+- 検証: vitest 5件 PASS / `pnpm build`（TypeScript 型チェック含む）成功。
+- 移行: `cd src && pnpm db:migrate-public-id`（冪等・衝突リトライ・short_id 温存）。
 
 ## Extension Configuration
 (extensions/ ディレクトリは空のため、適用対象なし)
