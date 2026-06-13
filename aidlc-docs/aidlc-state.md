@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION - slug-identifier ユニット（Build and Test 完了）
+- **Current Stage**: CONSTRUCTION - slug-identifier ユニット（Code Generation / Build and Test 完了）
+- **Active Feature**: 公開識別子の Google Meet 形式ランダムID化（カスタム入力なし・一本化）
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -20,19 +21,25 @@
 |-------|-------|--------|
 | INCEPTION | Workspace Detection | [x] Completed |
 | INCEPTION | Reverse Engineering | [x] Completed |
-| INCEPTION | Requirements Analysis | In Progress |
-| INCEPTION | User Stories | Pending |
-| INCEPTION | Workflow Planning | Pending |
-| INCEPTION | Application Design | Pending |
-| INCEPTION | Units Generation | Pending |
+| INCEPTION | Requirements Analysis | [x] Completed |
+| INCEPTION | User Stories | [-] Skipped (単一の識別子刷新で挙動が明確) |
+| INCEPTION | Workflow Planning | [x] Completed |
+| INCEPTION | Application Design | [-] Skip (新規コンポーネントなし) |
+| INCEPTION | Units Generation | [-] Skip (分解不要) |
 
-## Construction Progress — slug-identifier ユニット
+## Execution Plan Summary
+- **Stages to Execute**: Functional Design (軽量), Code Generation, Build and Test
+- **Stages to Skip**: User Stories, Application Design, Units Planning/Generation, NFR Requirements, NFR Design, Infrastructure Design
+- **Risk Level**: Medium
+- **Next Stage**: Construction - Functional Design
+
+## Construction Stage Progress — slug-identifier ユニット
 | Phase | Stage | Status |
 |-------|-------|--------|
-| CONSTRUCTION | Functional Design | [x] Completed（確定済み設計として承認扱い） |
-| CONSTRUCTION | NFR Requirements | N/A（スキップ） |
-| CONSTRUCTION | NFR Design | N/A（スキップ） |
-| CONSTRUCTION | Infrastructure Design | N/A（スキップ） |
+| CONSTRUCTION | Functional Design | [x] Completed（成果物4点・承認済） |
+| CONSTRUCTION | NFR Requirements | [-] Skip |
+| CONSTRUCTION | NFR Design | [-] Skip |
+| CONSTRUCTION | Infrastructure Design | [-] Skip |
 | CONSTRUCTION | Code Generation | [x] Completed |
 | CONSTRUCTION | Build and Test | [x] Completed |
 
@@ -43,4 +50,4 @@
 - 移行: `cd src && pnpm db:migrate-public-id`（冪等・衝突リトライ・short_id 温存）。
 
 ## Extension Configuration
-(To be populated during Requirements Analysis)
+(extensions/ ディレクトリは空のため、適用対象なし)
