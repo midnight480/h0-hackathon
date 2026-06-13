@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { normalizePublicId, isCanonicalId, formatPublicId } from '@/lib/public-id'
 import { SiteHeader } from '@/components/site-header'
@@ -217,7 +217,8 @@ export default async function DeckPage({
   if (!deck) {
     const canonical = await getCanonicalSlugByLegacy(username, slug)
     if (canonical) {
-      redirect(`/@${username}/${formatPublicId(canonical)}`)
+      // 旧タイトルURL → 新URLへ恒久リダイレクト（BR-5: 301相当）
+      permanentRedirect(`/@${username}/${formatPublicId(canonical)}`)
     }
     notFound()
   }

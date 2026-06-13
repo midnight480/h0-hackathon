@@ -43,9 +43,9 @@ async function main() {
   // legacy_slug 列をべき等に用意
   await client.query(`ALTER TABLE decks ADD COLUMN IF NOT EXISTS legacy_slug TEXT`)
 
-  // 未移行（正規形でない）デッキを抽出
+  // 未移行（正規形でない）デッキを抽出（削除済みは対象外）
   const { rows } = await client.query<{ id: string; slug: string }>(
-    `SELECT id, slug FROM decks WHERE slug !~ '^[a-z]{10}$'`,
+    `SELECT id, slug FROM decks WHERE slug !~ '^[a-z]{10}$' AND deleted_at IS NULL`,
   )
   console.log(`移行対象: ${rows.length} 件`)
 

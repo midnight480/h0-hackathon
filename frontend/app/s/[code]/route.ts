@@ -1,4 +1,4 @@
-import { redirect, notFound } from 'next/navigation'
+import { permanentRedirect, notFound } from 'next/navigation'
 import { auth } from '@clerk/nextjs/server'
 import { withDb } from '@/lib/db'
 import { formatPublicId } from '@/lib/public-id'
@@ -25,6 +25,6 @@ export async function GET(
   // 非公開デッキは所有者のみ
   if (row.is_public === false && viewerId !== row.user_id) notFound()
 
-  // レガシー短縮URL（/s/{code}）は新URL形式（公開識別子の表示形 3-4-3）へリダイレクト。
-  redirect(`/@${row.user_id}/${formatPublicId(row.slug)}`)
+  // レガシー短縮URL（/s/{code}）は新URL形式（公開識別子の表示形 3-4-3）へ恒久リダイレクト（BR-6: 301相当）。
+  permanentRedirect(`/@${row.user_id}/${formatPublicId(row.slug)}`)
 }

@@ -111,7 +111,7 @@ export async function createDeckRecord(params: {
         )
       })
       // 保存は正規形、戻り値には表示形（3-4-3）も含めて呼び出し側で利用できるようにする。
-      return { slug: publicId, publicId, displayId: formatPublicId(publicId) }
+      return { slug: publicId, displaySlug: formatPublicId(publicId) }
     } catch (err) {
       lastErr = err
       if (!isRetryableDeckInsertError(err)) throw err
