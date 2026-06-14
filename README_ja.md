@@ -8,7 +8,9 @@
 
 ## Hiravi とは？
 
-PDF スライドをアップロードするだけで、75言語以上に自動翻訳された Web スライドショーが完成。元のスライド画像は一切改変せず、翻訳と原文テキストは「参考レイヤー」として別管理します。
+PDF スライドをアップロードするだけで、75言語以上に自動翻訳された Web スライドショーが完成。元のスライド画像は一切改変せず、翻訳は元スライドの上に重ねるオーバーレイとして表示し、抽出した原文テキストとともに「参考レイヤー」として別管理します。
+
+公開デッキは `/@username/abcdefghij`（Google Meet 形式の slug）のような短く共有しやすい URL で配信され、アプリの UI 自体も多言語化（日本語 / 英語）しています。
 
 **名前の由来**: ひらり（紙が軽やかにめくれる様）+ visual + 開く（*hiraku*）
 
@@ -22,8 +24,8 @@ flowchart TD
 
     subgraph vercel["Vercel — Next.js 16 App Router"]
         UP["アップロード画面<br/>/upload"]
-        SA["Server Actions<br/>(upload.ts / deck.ts)"]
-        VIEW["デッキ閲覧 (ISR)<br/>/[user]/[slug]"]
+        SA["Server Actions<br/>(upload.ts / deck.ts / locale.ts)"]
+        VIEW["デッキ閲覧 (ISR)<br/>/@[user]/[slug]<br/>+ プロフィール /@[user]"]
     end
 
     subgraph aws["AWS — ap-northeast-1 (東京)"]
@@ -86,7 +88,8 @@ sequenceDiagram
 
 | レイヤー | 技術 | 補足 |
 |---|---|---|
-| フロントエンド | Next.js 16 (App Router), React 19, Tailwind CSS, shadcn/ui | AWS 呼び出しはすべて Server Actions 経由 |
+| フロントエンド | Next.js 16 (App Router), React 19, Tailwind CSS v4, shadcn/ui | AWS 呼び出しはすべて Server Actions 経由 |
+| UI 多言語化 | Cookie ベースのロケール（日本語 / 英語） | 辞書は `lib/i18n/`、`setLocale` Server Action で切替 |
 | ホスティング | Vercel (ISR + Web Analytics + Speed Insights) | スライドページをキャッシュ、webhook で再検証 |
 | データベース | **Aurora DSQL**（マルチリージョン・サーバーレス PostgreSQL） | `pg` + `@aws-sdk/dsql-signer`（IAM 認証トークン）で接続 |
 | 認証 | Clerk (`@clerk/nextjs`) | OAuth・セッション。匿名いいねは署名付き Cookie |
@@ -108,11 +111,18 @@ sequenceDiagram
 ├── Makefile                  # install / synth / deploy / frontend-dev / sync-env
 ├── frontend/                 # Next.js 16 アプリ（Vercel デプロイ）
 │   ├── app/                  # App Router: ページ・Server Actions・Route Handler
-│   │   ├── actions/          # upload.ts, deck.ts（Server Actions）
-│   │   ├── [user]/[slug]/    # 公開デッキビューア
-│   │   └── s/[code]/         # short-id リダイレクト
-│   ├── components/           # UI（deck-viewer, browse, shadcn/ui）
-│   └── lib/                  # db.ts (DSQL), data.ts, upload-limits.ts
+│   │   ├── actions/          # upload.ts, deck.ts, locale.ts（Server Actions）
+│   │   ├── [user]/           # 公開プロフィール（/@user）+ デッキビューア（[slug]）
+│   │   ├── browse/           # 公開デッキ一覧
+│   │   ├── dashboard/        # ログインユーザーのデッキ
+│   │   ├── upload/           # アップロード画面
+│   │   ├── s/[code]/         # short-id リダイレクト
+│   │   ├── sign-in/ sign-up/ # Clerk 認証ページ
+│   │   └── privacy/ terms/ security/  # 規約・ポリシーページ
+│   ├── components/           # UI（deck-viewer, deck-card, browse, shadcn/ui）
+│   └── lib/                  # db.ts (DSQL), data.ts, upload-limits.ts,
+│       │                     # username.ts, public-id.ts, clerk-users.ts
+│       └── i18n/             # ロケール設定・辞書（en/ja）・プロバイダ
 ├── src/                      # AWS CDK インフラ（TypeScript）
 │   ├── bin/                  # CDK アプリのエントリポイント
 │   ├── lib/                  # 6スタック定義
@@ -127,7 +137,7 @@ sequenceDiagram
 
 | テーブル | 役割 |
 |---|---|
-| `decks` | デッキのメタ情報・ステータス（`pending`→`ready`/`failed`）・カウンタ・論理削除（`deleted_at`） |
+| `decks` | デッキのメタ情報・ステータス（`pending`→`ready`/`failed`）・カウンタ・論理削除（`deleted_at`）。公開URL用の列: `slug`（Google Meet 形式 `^[a-z]{10}$`・UNIQUE）, `legacy_slug`（旧タイトル由来 slug・301 リダイレクト用）, `username`（`/@user/slug` 解決を Clerk API なしで行う非正規化 Clerk username） |
 | `slides` | 1ページ1行。`page_number` 順、S3 の `image_key` を保持 |
 | `slide_texts` | スライドごとのテキストを `language_code` 別に保持（`original` + 各翻訳言語） |
 | `deck_likes` | 複合主キー `(deck_id, liker_id)` — Clerk user_id または `anon:<uuid>` Cookie ID |
@@ -142,6 +152,8 @@ sequenceDiagram
 4. **DSQL は IAM 認証トークン** — 固定 DB パスワードを持たず、`@aws-sdk/dsql-signer` が接続ごとに短命トークンを発行。
 5. **OCC は「回避」でなく「対処」** — Aurora DSQL は楽観的並行制御。Lambda はロックに頼らず `40001` を指数バックオフでリトライ。
 6. **最小権限の認証情報** — Vercel 用 IAM ユーザーは S3 put/get/delete・SQS send・DSQL connect のみに限定。アクセスキーは Secrets Manager 管理（CloudFormation Outputs に平文出力しない）。
+7. **短く安定した公開URL** — デッキは `/@username/slug` で配信し、`slug` は Google Meet 形式のランダム英小文字10文字。Clerk の `username` を `decks` に非正規化保存し、閲覧/一覧は DSQL から直接オーナー解決（Clerk API を呼ばない）。旧 `user_id` 形式・タイトル由来 URL は `legacy_slug` を介して `301` リダイレクト。
+8. **ルート書き換えなしの UI 多言語化** — 日本語/英語の辞書を `locale` Cookie で選択。`setLocale` がサーバ側で Cookie を書き込み、`router.refresh()` で SSR を新ロケールで再描画するため、ロケールごとのルートセグメントは不要。
 
 ## はじめ方
 
