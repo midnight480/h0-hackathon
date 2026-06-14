@@ -124,7 +124,7 @@ export const ja: Dictionary = {
     viewMode: '表示モード',
     overlayMode: '重ねて表示',
     textMode: 'テキスト',
-    imageMode: '画像のみ',
+    imageMode: '元のスライド',
     aiTranslated: 'AI 翻訳',
     noText: 'このスライドには抽出されたテキストがありません。',
     allSlides: 'すべてのスライド',

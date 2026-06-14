@@ -122,7 +122,7 @@ export const en = {
     viewMode: 'Display mode',
     overlayMode: 'Overlay',
     textMode: 'Text',
-    imageMode: 'Image only',
+    imageMode: 'Original',
     aiTranslated: 'AI translated',
     noText: 'No extracted text for this slide.',
     allSlides: 'All slides',
