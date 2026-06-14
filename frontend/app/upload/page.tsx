@@ -164,6 +164,9 @@ export default function UploadPage() {
                 <span className="text-sm text-muted-foreground">
                   {t('upload.dropHint', { limit: MAX_UPLOAD_LABEL })}
                 </span>
+                <span className="text-xs text-muted-foreground/70">
+                  {t('upload.dropNote')}
+                </span>
                 <input
                   ref={inputRef}
                   type="file"

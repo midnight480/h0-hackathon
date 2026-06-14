@@ -73,6 +73,7 @@ export const en = {
     subtitle: 'Drop in a PDF and choose which languages to translate it into.',
     dropTitle: 'Drag & drop your PDF here',
     dropHint: 'or click to browse — up to {limit}',
+    dropNote: 'Only PDFs exported from PowerPoint or Google Slides are supported',
     removeFile: 'Remove file',
     fieldTitle: 'Title',
     titlePlaceholder: 'e.g. Designing for Aurora DSQL at Global Scale',

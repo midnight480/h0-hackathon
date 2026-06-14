@@ -75,6 +75,7 @@ export const ja: Dictionary = {
     subtitle: 'PDF をドロップして、翻訳する言語を選んでください。',
     dropTitle: 'PDF をここにドラッグ＆ドロップ',
     dropHint: 'またはクリックして選択 — 最大 {limit}',
+    dropNote: '※ PowerPoint または Google Slides から書き出した PDF のみ対応しています',
     removeFile: 'ファイルを削除',
     fieldTitle: 'タイトル',
     titlePlaceholder: '例: グローバル規模での Aurora DSQL 設計',
