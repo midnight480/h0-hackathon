@@ -47,8 +47,15 @@ def main(event, context):
             # 4. 翻訳
             translations = translate_texts(texts, target_languages)
 
+            # 4b. オーバーレイ表示（B案）用のブロック生成＋ブロック単位翻訳
+            #     元画像の上に訳文を元の位置で重ねるためのレイアウト情報。
+            layout = extract_overlay_blocks(pdf_path)
+            layout = translate_overlay_blocks(layout, target_languages)
+
             # 5. DB 更新 (processing_status = 'ready')
-            update_deck_status(deck_id, "ready", image_keys, texts, translations)
+            update_deck_status(
+                deck_id, "ready", image_keys, texts, translations, layout
+            )
 
             # 6. Vercel キャッシュ無効化
             revalidate_vercel_cache(deck_id)
@@ -205,6 +212,215 @@ def extract_text_from_pdf(pdf_path: str) -> list[str]:
     return texts
 
 
+def _median(values: list[float]) -> float:
+    """numpy に依存しない中央値（空リストは 0.0）"""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    n = len(s)
+    mid = n // 2
+    if n % 2 == 1:
+        return float(s[mid])
+    return (s[mid - 1] + s[mid]) / 2.0
+
+
+def _sample_bg_color(img, x0: int, y0: int, x1: int, y1: int) -> str:
+    """ブロック領域の外周リング（枠）の中央値色を背景色として推定。
+
+    テキスト本体の色を拾わないよう、領域内側ではなく外周バンドのみを参照する。
+    img は PIL.Image (RGB)、座標はピクセル。戻り値は "#rrggbb"。
+    """
+    W, H = img.size
+    x0 = max(0, min(W - 1, int(x0)))
+    y0 = max(0, min(H - 1, int(y0)))
+    x1 = max(x0 + 1, min(W, int(x1)))
+    y1 = max(y0 + 1, min(H, int(y1)))
+
+    crop = img.crop((x0, y0, x1, y1))
+    cw, ch = crop.size
+    px = crop.load()
+
+    # 外周バンドの厚み（領域の 1/8、最低 1px）
+    bx = max(1, cw // 8)
+    by = max(1, ch // 8)
+    # 大きい領域でも安価に収まるよう間引きしてサンプリング
+    step_x = max(1, cw // 64)
+    step_y = max(1, ch // 64)
+
+    rs: list[int] = []
+    gs: list[int] = []
+    bs: list[int] = []
+    for yy in range(0, ch, step_y):
+        for xx in range(0, cw, step_x):
+            on_border = xx < bx or xx >= cw - bx or yy < by or yy >= ch - by
+            if not on_border:
+                continue
+            pixel = px[xx, yy]
+            rs.append(pixel[0])
+            gs.append(pixel[1])
+            bs.append(pixel[2])
+
+    if not rs:
+        pixel = px[0, 0]
+        return "#%02x%02x%02x" % (pixel[0], pixel[1], pixel[2])
+
+    def med_int(v: list[int]) -> int:
+        v.sort()
+        return v[len(v) // 2]
+
+    return "#%02x%02x%02x" % (med_int(rs), med_int(gs), med_int(bs))
+
+
+def extract_overlay_blocks(pdf_path: str) -> list[list[dict]]:
+    """オーバーレイ表示（B案）用のブロック配列を抽出（原文のみ・未翻訳）。
+
+    get_text("dict") でブロック/行/span を取得し、ブロックごとに
+      - bbox（ページ幅/高さに対する 0..1 正規化）
+      - fs（block 内 span サイズの中央値をページ高で正規化）
+      - bg（レンダリング画像から外周リング中央値で推定した背景色）
+      - t.original（原文）
+    を生成する。
+
+    テキストパネル用 extract_text_from_pdf とは役割を分離し、ここでは
+    ページ番号ブロックのみ除外する（フッター/ヘッダーは本来の位置に重ねれば
+    混乱しないため含める）。
+
+    戻り値: ページごとのブロック配列 list[list[dict]]
+    """
+    import fitz  # PyMuPDF
+    import re
+    import PIL.Image
+
+    PAGE_NUMBER_RE = re.compile(r"^\s*\d+\s*$")
+
+    doc = fitz.open(pdf_path)
+    pages_blocks: list[list[dict]] = []
+
+    # 背景色サンプリング用の解像度。色の代表値（中央値）推定が目的なので
+    # 高解像度は不要。低倍率にして CPU/メモリ消費を抑える（WebP 生成側は別途 2.0x）。
+    BG_SAMPLE_SCALE = 0.5
+
+    for page in doc:
+        width = page.rect.width or 1.0
+        height = page.rect.height or 1.0
+
+        # 背景色サンプリング用に低解像度で 1 度だけレンダリング（画像生成とは別途）
+        pix = page.get_pixmap(matrix=fitz.Matrix(BG_SAMPLE_SCALE, BG_SAMPLE_SCALE))
+        img = PIL.Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        scale_x = pix.width / width
+        scale_y = pix.height / height
+
+        blocks: list[dict] = []
+        for b in page.get_text("dict").get("blocks", []):
+            if b.get("type", 0) != 0:  # テキストブロックのみ
+                continue
+
+            sizes: list[float] = []
+            line_texts: list[str] = []
+            for line in b.get("lines", []):
+                spans = line.get("spans", [])
+                line_text = "".join(s.get("text", "") for s in spans)
+                if line_text.strip():
+                    line_texts.append(line_text)
+                for s in spans:
+                    if s.get("text", "").strip():
+                        sizes.append(float(s.get("size", 0.0)))
+
+            text = "\n".join(line_texts).strip()
+            if not text:
+                continue
+            # ページ番号ブロックのみ除外
+            if PAGE_NUMBER_RE.match(text):
+                continue
+
+            x0, y0, x1, y1 = b["bbox"]
+            # フォント高さをページ高で正規化（取得不能時は控えめな既定値）
+            fs = (_median(sizes) / height) if sizes else 0.03
+            bg = _sample_bg_color(
+                img, x0 * scale_x, y0 * scale_y, x1 * scale_x, y1 * scale_y
+            )
+
+            blocks.append({
+                "x0": round(x0 / width, 5),
+                "y0": round(y0 / height, 5),
+                "x1": round(x1 / width, 5),
+                "y1": round(y1 / height, 5),
+                "fs": round(fs, 5),
+                "bg": bg,
+                "t": {"original": text},
+            })
+
+        pages_blocks.append(blocks)
+        # ページ数が多くてもメモリが累積しないよう明示的に解放
+        img.close()
+        pix = None
+
+    doc.close()
+    return pages_blocks
+
+
+def translate_overlay_blocks(
+    pages_blocks: list[list[dict]], target_languages: list[str]
+) -> list[list[dict]]:
+    """オーバーレイ用ブロックを言語×ブロック単位で並列翻訳。
+
+    既存 translate_texts と同じ ThreadPool(50) パターンを流用。原文は
+    t.original に格納済み。空文字や数字・記号のみのブロックは翻訳をスキップし
+    原文をそのまま採用する（API 呼び出しの無駄打ちと誤訳を防ぐ）。
+    """
+    import boto3
+    import re
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # 数字・記号・空白のみ（翻訳しても意味がない）
+    NON_TRANSLATABLE_RE = re.compile(r"^[\d\W_]+$")
+
+    tasks: list[tuple[int, int, str, str]] = []
+    for p_idx, blocks in enumerate(pages_blocks):
+        for b_idx, blk in enumerate(blocks):
+            original = blk["t"].get("original", "")
+            stripped = original.strip()
+            for lang in target_languages:
+                if not stripped or NON_TRANSLATABLE_RE.match(stripped):
+                    blk["t"][lang] = original
+                    continue
+                tasks.append((p_idx, b_idx, lang, original))
+
+    if not tasks:
+        return pages_blocks
+
+    def translate_one(
+        p_idx: int, b_idx: int, lang: str, text: str
+    ) -> tuple[int, int, str, str]:
+        # 個別ブロックの翻訳失敗（レート制限・一時的なネットワークエラー等）が
+        # スライド処理全体を failed にしないよう、例外時は原文をフォールバック。
+        try:
+            client = boto3.client("translate")
+            resp = client.translate_text(
+                Text=text[:10000],
+                SourceLanguageCode="auto",
+                TargetLanguageCode=lang,
+            )
+            return p_idx, b_idx, lang, resp["TranslatedText"]
+        except Exception as e:
+            logger.warning(
+                f"Overlay block translation failed (lang={lang}): {e}; "
+                "falling back to original text"
+            )
+            return p_idx, b_idx, lang, text
+
+    with ThreadPoolExecutor(max_workers=50) as executor:
+        futures = [
+            executor.submit(translate_one, p_idx, b_idx, lang, text)
+            for (p_idx, b_idx, lang, text) in tasks
+        ]
+        for future in as_completed(futures):
+            p_idx, b_idx, lang, translated = future.result()
+            pages_blocks[p_idx][b_idx]["t"][lang] = translated
+
+    return pages_blocks
+
+
 def translate_texts(
     texts: list[str], target_languages: list[str]
 ) -> dict[str, list[str]]:
@@ -249,6 +465,7 @@ def update_deck_status(
     image_keys: list[str] | None = None,
     texts: list[str] | None = None,
     translations: dict[str, list[str]] | None = None,
+    layout: list[list[dict]] | None = None,
 ):
     """Aurora DSQL のデッキステータスと処理結果を更新"""
     from aurora_dsql_psycopg import connect
@@ -290,10 +507,15 @@ def update_deck_status(
 
                 # 3. スライドとテキストの保存
                 for i, image_key in enumerate(image_keys, start=1):
-                    # スライド本体
+                    # オーバーレイ用ブロック配列（該当ページ。無ければ空配列）
+                    slide_layout = (
+                        layout[i - 1] if layout and i - 1 < len(layout) else []
+                    )
+                    # スライド本体（layout は JSONB。text→jsonb の明示キャストで保存）
                     cur.execute(
-                        "INSERT INTO slides (deck_id, page_number, image_key) VALUES (%s, %s, %s) RETURNING id",
-                        (deck_id, i, image_key)
+                        "INSERT INTO slides (deck_id, page_number, image_key, layout) "
+                        "VALUES (%s, %s, %s, %s::jsonb) RETURNING id",
+                        (deck_id, i, image_key, json.dumps(slide_layout))
                     )
                     slide_id = cur.fetchone()[0]
 

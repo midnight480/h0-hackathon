@@ -110,10 +110,24 @@ export interface Author {
   avatarUrl: string
 }
 
+// オーバーレイ表示（B案）用のブロック。bbox はページ幅/高さに対する 0..1 正規化、
+// fs はフォント高さのページ高に対する正規化、bg は原文を隠す背景色、t は各言語の訳文。
+export interface SlideBlock {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  fs: number
+  bg: string
+  t: Partial<Record<LanguageCode | 'original', string>>
+}
+
 export interface Slide {
   pageNumber: number
   imageUrl: string
   text: Partial<Record<LanguageCode, string>>
+  // オーバーレイ表示用ブロック配列（未処理／旧デッキは空配列または未定義）
+  layout?: SlideBlock[]
 }
 
 export interface Deck {
