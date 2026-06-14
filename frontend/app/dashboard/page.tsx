@@ -30,7 +30,6 @@ interface DeckRow {
   original_language: string
   target_languages: string[]
   slide_count: number
-  views: number
   likes: number
   status: ProcessingStatus
   cover_image_key: string | null
@@ -163,7 +162,7 @@ export default async function DashboardPage() {
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<DeckRow>(
       `SELECT id, slug, username, title, original_language, target_languages,
-              slide_count, views, likes, status, cover_image_key, published_at, is_public
+              slide_count, likes, status, cover_image_key, published_at, is_public
        FROM decks
        WHERE user_id = $1 AND deleted_at IS NULL
        ORDER BY published_at DESC`,
@@ -178,12 +177,10 @@ export default async function DashboardPage() {
   })
 
   const published = decks.filter((d) => d.status === 'ready')
-  const totalViews = published.reduce((s, d) => s + d.views, 0)
   const totalLikes = published.reduce((s, d) => s + d.likes, 0)
 
   const stats = [
     { label: t('dashboard.statDecks'), value: `${decks.length}` },
-    { label: t('dashboard.statReads'), value: formatCount(totalViews) },
     { label: t('dashboard.statLikes'), value: formatCount(totalLikes) },
     { label: t('dashboard.statLanguages'), value: `${new Set(decks.flatMap((d) => d.target_languages)).size}` },
   ]
@@ -205,7 +202,7 @@ export default async function DashboardPage() {
             </Button>
           </div>
 
-          <dl className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <dl className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
             {stats.map((s) => (
               <div key={s.label} className="rounded-xl border border-border bg-card p-4">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
