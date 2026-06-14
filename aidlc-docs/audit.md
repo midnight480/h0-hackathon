@@ -134,3 +134,11 @@
 **Context**: Construction - Code Generation / Build and Test 完了（username-routing）。DSQL スキーマ適用＋バックフィル（midnight480）はマージ後に人間側で実行予定。
 
 ---
+
+## Operations - DSQL スキーマ適用＋username バックフィルの実行
+**Timestamp**: 2026-06-14T00:00:00Z
+**User Input**: "（一時STSクレデンシャル）を使って、Mainブランチの内容を再進化して、1. db:schema（username列+index）2. db:backfill-username（既存デッキへusername設定）3. 動作確認 を進めてください"
+**AI Response**: main を pull（Web実装マージ済: schema.sql username列+index, backfill-username.ts, ルーティング/表示の username 化）。本番整合性のため、本番 DSQL（...ra.dsql.us-east-1.on.aws）と本番 Clerk キー（.env の sk_live_、.env.local は sk_test_ のため不採用）を突合して使用。順序: ① `npm run db:schema`（`ALTER ADD COLUMN IF NOT EXISTS username` ＋ `idx_decks_username` 作成、他は冪等no-op）→ ② `npm run db:backfill-username`（distinct user_id=1名を Clerk REST で解決 → user_3F2L... を midnight480 として4件 UPDATE、スキップ0）。検証: 総デッキ4件・username設定済み4/4・新URL `/@midnight480/{slug}`（例 /@midnight480/juavoudnpj）。一時検証スクリプトは削除、コミット対象の副次変更なし。
+**Context**: Operations - username-routing の本番 DSQL スキーマ変更（username列+index）とバックフィルを正常完了。認証情報は一時STS（要ローテーション）。
+
+---
