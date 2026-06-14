@@ -136,44 +136,61 @@ async function getDeckFromDb(
   }
 }
 
-// 正規形 slug で所有者デッキを引き、その username（無ければ null）を返す軽量ルックアップ。
+// リダイレクト判定に使う所有者・可視性情報。
+type DeckOwner = { username: string | null; userId: string; isPublic: boolean | null }
+
+// 閲覧可能か判定する。公開（is_public が true / NULL）か、閲覧者が所有者なら可視。
+// 非公開デッキの旧URLを知る非所有者に対して、301 のリダイレクト先（username）や
+// デッキ存在を漏らさないため、リダイレクト前に必ずこの判定を通す。
+function isVisible(owner: DeckOwner, viewerId: string | null): boolean {
+  return owner.isPublic !== false || viewerId === owner.userId
+}
+
+// 正規形 slug で所有者デッキを引き、username・所有者・可視性を返す軽量ルックアップ。
 // 旧 user_id URL を username 形式へ 301 すべきか判定するために使う（Clerk は呼ばない）。
 async function lookupDeckOwner(
   ownerColumn: OwnerColumn,
   ownerValue: string,
   slug: string,
-): Promise<{ username: string | null } | null> {
+): Promise<DeckOwner | null> {
   try {
     return await withDb(async (client) => {
-      const { rows } = await client.query<{ username: string | null }>(
-        `SELECT username FROM decks
+      const { rows } = await client.query<{ username: string | null; user_id: string; is_public: boolean | null }>(
+        `SELECT username, user_id, is_public FROM decks
          WHERE ${ownerColumn} = $1 AND slug = $2 AND deleted_at IS NULL
          LIMIT 1`,
         [ownerValue, slug],
       )
-      return rows.length === 0 ? null : { username: rows[0].username ?? null }
+      return rows[0]
+        ? { username: rows[0].username ?? null, userId: rows[0].user_id, isPublic: rows[0].is_public }
+        : null
     })
   } catch {
     return null
   }
 }
 
-// レガシー slug（旧タイトル由来URL）から現在の正規形 slug と所有者 username を引く。
-// 見つかれば新URLへリダイレクトするために使用する。
+// レガシー slug（旧タイトル由来URL）から現在の正規形 slug と所有者・可視性を引く。
+// 見つかり、かつ可視な場合のみ新URLへリダイレクトするために使用する。
 async function getCanonicalSlugByLegacy(
   ownerColumn: OwnerColumn,
   ownerValue: string,
   legacySlug: string,
-): Promise<{ canonicalSlug: string; username: string | null } | null> {
+): Promise<{ canonicalSlug: string; owner: DeckOwner } | null> {
   try {
     return await withDb(async (client) => {
-      const { rows } = await client.query<{ slug: string; username: string | null }>(
-        `SELECT slug, username FROM decks
+      const { rows } = await client.query<{ slug: string; username: string | null; user_id: string; is_public: boolean | null }>(
+        `SELECT slug, username, user_id, is_public FROM decks
          WHERE ${ownerColumn} = $1 AND legacy_slug = $2 AND deleted_at IS NULL
          LIMIT 1`,
         [ownerValue, legacySlug],
       )
-      return rows[0] ? { canonicalSlug: rows[0].slug, username: rows[0].username ?? null } : null
+      return rows[0]
+        ? {
+            canonicalSlug: rows[0].slug,
+            owner: { username: rows[0].username ?? null, userId: rows[0].user_id, isPublic: rows[0].is_public },
+          }
+        : null
     })
   } catch {
     return null
@@ -245,20 +262,23 @@ export default async function DeckPage({
   if (isUserId(raw)) {
     // ===== 旧URL（Clerk user_id 形式）=====
     // 所有者に username があれば username 形式へ 301、無ければ user_id のまま表示（フォールバック）。
+    // ただし非公開デッキの存在・所有者 username を漏らさないため、可視（公開 or 所有者）な場合のみ。
     if (isCanonicalId(normalized)) {
       const owner = await lookupDeckOwner('user_id', raw, normalized)
-      if (owner?.username) {
-        permanentRedirect(`/@${owner.username}/${formatPublicId(normalized)}`)
-      }
-      if (owner) {
+      if (owner && isVisible(owner, viewerId)) {
+        if (owner.username) {
+          permanentRedirect(`/@${owner.username}/${formatPublicId(normalized)}`)
+        }
+        // username 無し（フォールバック）→ user_id のまま表示
         deck = await getDeckFromDb('user_id', raw, normalized, viewerId)
       }
+      // 非公開・非所有者、または未ヒットは下の legacy 検索 → notFound に委ねる
     }
     if (!deck) {
-      // レガシー slug（旧タイトルURL）として検索。username があれば username 形式へ、無ければ user_id のまま 301。
+      // レガシー slug（旧タイトルURL）として検索。可視な場合のみ、username があれば username 形式へ、無ければ user_id のまま 301。
       const legacy = await getCanonicalSlugByLegacy('user_id', raw, slug)
-      if (legacy) {
-        const target = legacy.username ?? raw
+      if (legacy && isVisible(legacy.owner, viewerId)) {
+        const target = legacy.owner.username ?? raw
         permanentRedirect(`/@${target}/${formatPublicId(legacy.canonicalSlug)}`)
       }
       notFound()
@@ -270,9 +290,10 @@ export default async function DeckPage({
       deck = await getDeckFromDb('username', uname, normalized, viewerId)
     }
     if (!deck) {
-      // 未ヒット時はレガシー slug（旧タイトルURL）として検索し、新URLへリダイレクト（BR-5: 301相当）。
+      // 未ヒット時はレガシー slug（旧タイトルURL）として検索し、可視な場合のみ新URLへリダイレクト（BR-5: 301相当）。
+      // 非公開デッキの正規 slug を旧URL経由で漏らさないため、可視性を確認する。
       const legacy = await getCanonicalSlugByLegacy('username', uname, slug)
-      if (legacy) {
+      if (legacy && isVisible(legacy.owner, viewerId)) {
         permanentRedirect(`/@${raw}/${formatPublicId(legacy.canonicalSlug)}`)
       }
       notFound()
