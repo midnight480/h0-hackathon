@@ -55,7 +55,6 @@ export const en = {
     title: 'Your decks',
     newDeck: 'New deck',
     statDecks: 'Decks',
-    statReads: 'Total reads',
     statLikes: 'Total likes',
     statLanguages: 'Languages',
     sectionTitle: 'Your decks',

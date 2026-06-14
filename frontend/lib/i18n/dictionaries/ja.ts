@@ -57,7 +57,6 @@ export const ja: Dictionary = {
     title: 'あなたのデッキ',
     newDeck: '新規デッキ',
     statDecks: 'デッキ',
-    statReads: '総閲覧数',
     statLikes: '総いいね数',
     statLanguages: '言語',
     sectionTitle: 'あなたのデッキ',
