@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS slides (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- layout: オーバーレイ表示（B案）用のブロック配列。1スライド分の全言語訳文を
+-- まとめて保持する。各要素は bbox（ページ幅/高さに対する 0..1 正規化）、フォント
+-- サイズ fs（ページ高に対する正規化）、背景色 bg、各言語の訳文 t を持つ。
+-- 既存デッキは空配列 [] となり、テキストパネル等の既存表示は従来どおり動く。
+ALTER TABLE slides ADD COLUMN IF NOT EXISTS layout JSONB NOT NULL DEFAULT '[]';
+
 CREATE TABLE IF NOT EXISTS slide_texts (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slide_id      UUID NOT NULL,

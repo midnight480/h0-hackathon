@@ -5,7 +5,7 @@ import { isUserId, normalizeUsername } from '@/lib/username'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { DeckViewer } from '@/components/deck-viewer'
-import { type Deck, type Slide, type LanguageCode } from '@/lib/data'
+import { type Deck, type Slide, type SlideBlock, type LanguageCode } from '@/lib/data'
 import { withDb } from '@/lib/db'
 import { getClerkUsers } from '@/lib/clerk-users'
 import { hasLikedDeck } from '@/app/actions/deck'
@@ -73,10 +73,11 @@ async function getDeckFromDb(
       const { rows: slideRows } = await client.query<{
         page_number: number
         image_key: string | null
+        layout: unknown
         language_code: string | null
         content: string | null
       }>(
-        `SELECT s.page_number, s.image_key, st.language_code, st.content
+        `SELECT s.page_number, s.image_key, s.layout, st.language_code, st.content
          FROM slides s
          LEFT JOIN slide_texts st ON st.slide_id = s.id
          WHERE s.deck_id = $1
@@ -84,10 +85,28 @@ async function getDeckFromDb(
         [d.id],
       )
 
-      const slideMap = new Map<number, { imageKey: string | null; texts: Record<string, string> }>()
+      // JSONB は pg ドライバ次第で object または string で来るため両対応でパース
+      const parseLayout = (raw: unknown): SlideBlock[] => {
+        if (!raw) return []
+        try {
+          const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+          return Array.isArray(arr) ? (arr as SlideBlock[]) : []
+        } catch {
+          return []
+        }
+      }
+
+      const slideMap = new Map<
+        number,
+        { imageKey: string | null; layout: SlideBlock[]; texts: Record<string, string> }
+      >()
       for (const row of slideRows) {
         if (!slideMap.has(row.page_number)) {
-          slideMap.set(row.page_number, { imageKey: row.image_key, texts: {} })
+          slideMap.set(row.page_number, {
+            imageKey: row.image_key,
+            layout: parseLayout(row.layout),
+            texts: {},
+          })
         }
         if (row.language_code && row.content) {
           slideMap.get(row.page_number)!.texts[row.language_code] = row.content
@@ -100,10 +119,11 @@ async function getDeckFromDb(
 
       const slides: Slide[] = Array.from(slideMap.entries())
         .sort(([a], [b]) => a - b)
-        .map(([pageNumber, { imageKey, texts }]) => ({
+        .map(([pageNumber, { imageKey, layout, texts }]) => ({
           pageNumber,
           imageUrl: imageKey ? `${s3Base}/${imageKey}` : '/placeholder.svg',
           text: texts as Partial<Record<LanguageCode, string>>,
+          layout,
         }))
 
       const targetLanguages = Array.isArray(d.target_languages)
