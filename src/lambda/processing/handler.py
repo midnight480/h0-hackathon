@@ -112,14 +112,95 @@ def convert_pdf_to_images(pdf_path: str, deck_id: str) -> list[str]:
 
 
 def extract_text_from_pdf(pdf_path: str) -> list[str]:
-    """PDF テキストレイヤーからテキスト抽出"""
+    """PDF テキストレイヤーからテキスト抽出
+
+    各ページを bbox 付きブロック (get_text("blocks")) として読み込み、
+    ページ番号・running footer/header などのノイズを翻訳前に除外する。
+    戻り値は従来どおり「スライドごとの連結テキスト (list[str])」。
+
+    除外ルール（保守的に倒す = 本文を消すよりノイズが少し残る方を許容）:
+      1. ページ番号: ブロック text が ^\\s*\\d+\\s*$ に一致 → 除外
+      2. running footer/header: 正規化テキスト（空白・数字を除去）が同一かつ
+         上端/下端ゾーンに出現するブロックが、総ページ数の50%以上に登場 → 除外
+      3. 位置ゾーン補助: ゾーン（下端12% / 上端8%）は単独判定に使わず、
+         必ずルール2と併用（本文を消さないため）
+    """
     import fitz  # PyMuPDF
+    import re
+
+    PAGE_NUMBER_RE = re.compile(r"^\s*\d+\s*$")
+    TOP_ZONE = 0.08      # 上端 8%
+    BOTTOM_ZONE = 0.88   # 下端 12% (= y >= 0.88)
+
+    def normalize(t: str) -> str:
+        # 空白・数字を除去して比較（ページごとに変わる番号を吸収）
+        return re.sub(r"[\s\d]+", "", t)
 
     doc = fitz.open(pdf_path)
-    texts = []
+
+    # 1) 全ページの blocks を収集。bbox はページ高/幅に対する割合に正規化
+    pages_blocks: list[list[dict]] = []
     for page in doc:
-        text = page.get_text().strip()
-        texts.append(text)
+        width = page.rect.width or 1.0
+        height = page.rect.height or 1.0
+        blocks: list[dict] = []
+        for b in page.get_text("blocks"):
+            # (x0, y0, x1, y1, text, block_no, block_type)
+            x0, y0, x1, y1, text, _block_no, block_type = b
+            if block_type != 0:  # テキストブロック (0) のみ対象
+                continue
+            text = text.strip()
+            if not text:
+                continue
+            blocks.append({
+                "x0": x0 / width,
+                "y0": y0 / height,
+                "x1": x1 / width,
+                "y1": y1 / height,
+                "text": text,
+            })
+        pages_blocks.append(blocks)
+
+    total_pages = len(pages_blocks)
+
+    # 2) 横断パスで「除外ブロック集合」を確定（running footer/header）
+    #    正規化テキスト → 上端/下端ゾーンに出現したページ番号の集合
+    zone_text_pages: dict[str, set[int]] = {}
+    for page_idx, blocks in enumerate(pages_blocks):
+        for blk in blocks:
+            in_zone = blk["y0"] <= TOP_ZONE or blk["y1"] >= BOTTOM_ZONE
+            if not in_zone:
+                continue
+            key = normalize(blk["text"])
+            if not key:
+                continue
+            zone_text_pages.setdefault(key, set()).add(page_idx)
+
+    # 総ページ数の50%以上。小規模デッキでの誤検出を避けるため最低2ページを要求
+    threshold = max(2, (total_pages + 1) // 2)
+    running_keys = {
+        key for key, pages in zone_text_pages.items()
+        if len(pages) >= threshold
+    }
+
+    # 3) 各ページ：除外対象でないブロックのみ読み順 (y0, x0) 昇順で連結
+    texts: list[str] = []
+    for blocks in pages_blocks:
+        kept: list[dict] = []
+        for blk in blocks:
+            text = blk["text"]
+            # ルール1: ページ番号
+            if PAGE_NUMBER_RE.match(text):
+                continue
+            # ルール2+3: running footer/header（ゾーン内 AND 横断一致）
+            in_zone = blk["y0"] <= TOP_ZONE or blk["y1"] >= BOTTOM_ZONE
+            if in_zone and normalize(text) in running_keys:
+                continue
+            kept.append(blk)
+        # blocks は読み順とは限らないため bbox (y0, x0) でソートしてから連結
+        kept.sort(key=lambda b: (b["y0"], b["x0"]))
+        texts.append("\n".join(b["text"] for b in kept).strip())
+
     doc.close()
     return texts
 
