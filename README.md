@@ -8,7 +8,9 @@
 
 ## What is Hiravi?
 
-Upload a PDF slide deck → Get a web-native slideshow with automatic translations in 75+ languages. The original slide images are never modified — translations are stored as a separate reference layer alongside the source text.
+Upload a PDF slide deck → Get a web-native slideshow with automatic translations in 75+ languages. The original slide images are never modified — translations render as an optional overlay on top of the source slide, stored as a separate reference layer alongside the extracted text.
+
+Decks live at clean, shareable URLs like `/@username/abcdefghij` (Google-Meet-style slug), and the app UI itself is localized (English / Japanese).
 
 **Name**: ひらり (paper fluttering) + visual + 開く (*hiraku*, to open)
 
@@ -22,8 +24,8 @@ flowchart TD
 
     subgraph vercel["Vercel — Next.js 16 App Router"]
         UP["Upload page<br/>/upload"]
-        SA["Server Actions<br/>(upload.ts / deck.ts)"]
-        VIEW["Deck pages (ISR)<br/>/[user]/[slug]"]
+        SA["Server Actions<br/>(upload.ts / deck.ts / locale.ts)"]
+        VIEW["Deck pages (ISR)<br/>/@[user]/[slug]<br/>+ profile /@[user]"]
     end
 
     subgraph aws["AWS — ap-northeast-1 (Tokyo)"]
@@ -86,7 +88,8 @@ sequenceDiagram
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS, shadcn/ui | Server Actions for all AWS calls |
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4, shadcn/ui | Server Actions for all AWS calls |
+| i18n (UI) | Cookie-based locale (English / Japanese) | Dictionaries in `lib/i18n/`, switched via `setLocale` Server Action |
 | Hosting | Vercel (ISR + Web Analytics + Speed Insights) | Slide pages cached, revalidated by webhook |
 | Database | **Aurora DSQL** (multi-region serverless PostgreSQL) | Accessed via `pg` + `@aws-sdk/dsql-signer` (IAM auth token) |
 | Auth | Clerk (`@clerk/nextjs`) | OAuth, sessions; anonymous likes via signed cookie |
@@ -108,11 +111,18 @@ sequenceDiagram
 ├── Makefile                  # install / synth / deploy / frontend-dev / sync-env
 ├── frontend/                 # Next.js 16 app (deployed to Vercel)
 │   ├── app/                  # App Router: pages, Server Actions, route handlers
-│   │   ├── actions/          # upload.ts, deck.ts (Server Actions)
-│   │   ├── [user]/[slug]/    # public deck viewer
-│   │   └── s/[code]/         # short-id redirect
-│   ├── components/           # UI (deck-viewer, browse, shadcn/ui)
-│   └── lib/                  # db.ts (DSQL), data.ts, upload-limits.ts
+│   │   ├── actions/          # upload.ts, deck.ts, locale.ts (Server Actions)
+│   │   ├── [user]/           # public profile (/@user) + deck viewer ([slug])
+│   │   ├── browse/           # public deck gallery
+│   │   ├── dashboard/        # signed-in user's decks
+│   │   ├── upload/           # upload page
+│   │   ├── s/[code]/         # short-id redirect
+│   │   ├── sign-in/ sign-up/ # Clerk auth pages
+│   │   └── privacy/ terms/ security/  # legal & policy pages
+│   ├── components/           # UI (deck-viewer, deck-card, browse, shadcn/ui)
+│   └── lib/                  # db.ts (DSQL), data.ts, upload-limits.ts,
+│       │                     # username.ts, public-id.ts, clerk-users.ts
+│       └── i18n/             # locale config, dictionaries (en/ja), provider
 ├── src/                      # AWS CDK infrastructure (TypeScript)
 │   ├── bin/                  # CDK app entry point
 │   ├── lib/                  # 6 stack definitions
@@ -127,7 +137,7 @@ sequenceDiagram
 
 | Table | Purpose |
 |---|---|
-| `decks` | Deck metadata, status (`pending`→`ready`/`failed`), counters, soft-delete (`deleted_at`) |
+| `decks` | Deck metadata, status (`pending`→`ready`/`failed`), counters, soft-delete (`deleted_at`). Public identity columns: `slug` (Google-Meet-style `^[a-z]{10}$`, UNIQUE), `legacy_slug` (old title-derived slug, kept for 301 redirects), `username` (denormalized Clerk username for `/@user/slug` resolution without a Clerk API call) |
 | `slides` | One row per page, ordered by `page_number`, points to S3 `image_key` |
 | `slide_texts` | Per-slide text keyed by `language_code` (`original` + each target language) |
 | `deck_likes` | Composite PK `(deck_id, liker_id)` — Clerk user id or `anon:<uuid>` cookie id |
@@ -142,6 +152,8 @@ sequenceDiagram
 4. **IAM auth token for DSQL** — No static DB password; `@aws-sdk/dsql-signer` mints a short-lived token per connection.
 5. **OCC handled, not avoided** — Aurora DSQL is optimistic-concurrency; the Lambda retries `40001` serialization failures with exponential backoff rather than relying on locks.
 6. **Least-privilege credentials** — The Vercel IAM user is scoped to S3 put/get/delete, SQS send, and DSQL connect only; its access key is stored in Secrets Manager (never in CloudFormation outputs).
+7. **Clean, stable public URLs** — Decks are served at `/@username/slug` with a random Google-Meet-style 10-letter `slug`. The Clerk `username` is denormalized into `decks` so view/list pages resolve owners straight from DSQL (no Clerk API call); old `user_id`- and title-based URLs `301`-redirect via `legacy_slug`.
+8. **Localized UI without a router rewrite** — The interface ships English/Japanese dictionaries selected by a `locale` cookie; `setLocale` writes the cookie server-side and `router.refresh()` re-renders SSR in the new locale, so no per-locale route segment is needed.
 
 ## Getting Started
 
