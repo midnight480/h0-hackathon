@@ -80,10 +80,10 @@ function StatusBadge({ status, t }: { status: ProcessingStatus; t: TFunc }) {
   )
 }
 
-function DashRow({ deck, username, t }: { deck: DeckRow; username: string; t: TFunc }) {
+function DashRow({ deck, userId, t }: { deck: DeckRow; userId: string; t: TFunc }) {
   const ready = deck.status === 'ready'
   // 公開URL用の著者識別子は username（無ければ user_id へフォールバック）。
-  const owner = deck.username ?? username
+  const owner = deck.username ?? userId
   const region = process.env.NEXT_PUBLIC_AWS_REGION ?? 'us-east-1'
   const coverUrl = deck.cover_image_key
     ? `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${deck.cover_image_key}`
@@ -237,7 +237,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {decks.map((deck) => (
-                  <DashRow key={deck.id} deck={deck} username={userId} t={t} />
+                  <DashRow key={deck.id} deck={deck} userId={userId} t={t} />
                 ))}
               </div>
             )}

@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import { clerkClient } from '@clerk/nextjs/server'
 import { Heart, Layers } from 'lucide-react'
@@ -49,20 +49,23 @@ export default async function UserPage({
     userId = resolved
   }
 
-  // Clerk からプロフィール表示情報（氏名・アバター）を取得
-  let displayName = ''
-  let avatarUrl = ''
-  try {
-    const clerk = await clerkClient()
-    const clerkUser = await clerk.users.getUser(userId)
-    displayName =
-      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
-      clerkUser.username ||
-      ''
-    avatarUrl = clerkUser.imageUrl ?? ''
-  } catch {
-    notFound()
+  // Clerk からプロフィール表示情報（氏名・アバター）を取得。
+  // permanentRedirect は内部的に NEXT_REDIRECT をスローするため try-catch では包まず、
+  // 取得失敗は .catch(() => null) で吸収してから判定する（try 内で呼ぶと握り潰され notFound() に流れる）。
+  const clerk = await clerkClient()
+  const clerkUser = await clerk.users.getUser(userId).catch(() => null)
+  if (!clerkUser) notFound()
+
+  // 旧URL（user_id 形式）でアクセスされ、かつ username が設定済みなら新URLへ 301（SEO/正規化）。
+  if (isUserId(raw) && clerkUser.username) {
+    permanentRedirect(`/@${normalizeUsername(clerkUser.username)}`)
   }
+
+  const displayName =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
+    clerkUser.username ||
+    ''
+  const avatarUrl = clerkUser.imageUrl ?? ''
 
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<PublicDeck>(

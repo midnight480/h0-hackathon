@@ -26,16 +26,23 @@ function normalizeUsername(input: string): string {
 }
 
 // Clerk Backend API（REST）から user_id の username を取得する。未設定/取得失敗は null。
+// ネットワークエラー/タイムアウト等の例外も catch して null を返し、他ユーザーの処理を継続させる
+// （冪等なため、スキップされたユーザーは再実行で拾える）。
 async function fetchClerkUsername(userId: string): Promise<string | null> {
-  const res = await fetch(`${CLERK_API_URL}/v1/users/${userId}`, {
-    headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
-  })
-  if (!res.ok) {
-    console.warn(`  Clerk 取得失敗 (${res.status}): ${userId}`)
+  try {
+    const res = await fetch(`${CLERK_API_URL}/v1/users/${userId}`, {
+      headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
+    })
+    if (!res.ok) {
+      console.warn(`  Clerk 取得失敗 (${res.status}): ${userId}`)
+      return null
+    }
+    const data = (await res.json()) as { username?: string | null }
+    return data.username ? normalizeUsername(data.username) : null
+  } catch (err) {
+    console.warn(`  Clerk 取得エラー（接続不可など）: ${userId}`, err)
     return null
   }
-  const data = (await res.json()) as { username?: string | null }
-  return data.username ? normalizeUsername(data.username) : null
 }
 
 async function main() {
