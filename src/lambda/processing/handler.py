@@ -296,12 +296,16 @@ def extract_overlay_blocks(pdf_path: str) -> list[list[dict]]:
     doc = fitz.open(pdf_path)
     pages_blocks: list[list[dict]] = []
 
+    # 背景色サンプリング用の解像度。色の代表値（中央値）推定が目的なので
+    # 高解像度は不要。低倍率にして CPU/メモリ消費を抑える（WebP 生成側は別途 2.0x）。
+    BG_SAMPLE_SCALE = 0.5
+
     for page in doc:
         width = page.rect.width or 1.0
         height = page.rect.height or 1.0
 
-        # 背景色サンプリング用に 1 度だけレンダリング（画像生成とは別途）
-        pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+        # 背景色サンプリング用に低解像度で 1 度だけレンダリング（画像生成とは別途）
+        pix = page.get_pixmap(matrix=fitz.Matrix(BG_SAMPLE_SCALE, BG_SAMPLE_SCALE))
         img = PIL.Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         scale_x = pix.width / width
         scale_y = pix.height / height
@@ -347,6 +351,9 @@ def extract_overlay_blocks(pdf_path: str) -> list[list[dict]]:
             })
 
         pages_blocks.append(blocks)
+        # ページ数が多くてもメモリが累積しないよう明示的に解放
+        img.close()
+        pix = None
 
     doc.close()
     return pages_blocks
@@ -385,13 +392,22 @@ def translate_overlay_blocks(
     def translate_one(
         p_idx: int, b_idx: int, lang: str, text: str
     ) -> tuple[int, int, str, str]:
-        client = boto3.client("translate")
-        resp = client.translate_text(
-            Text=text[:10000],
-            SourceLanguageCode="auto",
-            TargetLanguageCode=lang,
-        )
-        return p_idx, b_idx, lang, resp["TranslatedText"]
+        # 個別ブロックの翻訳失敗（レート制限・一時的なネットワークエラー等）が
+        # スライド処理全体を failed にしないよう、例外時は原文をフォールバック。
+        try:
+            client = boto3.client("translate")
+            resp = client.translate_text(
+                Text=text[:10000],
+                SourceLanguageCode="auto",
+                TargetLanguageCode=lang,
+            )
+            return p_idx, b_idx, lang, resp["TranslatedText"]
+        except Exception as e:
+            logger.warning(
+                f"Overlay block translation failed (lang={lang}): {e}; "
+                "falling back to original text"
+            )
+            return p_idx, b_idx, lang, text
 
     with ThreadPoolExecutor(max_workers=50) as executor:
         futures = [

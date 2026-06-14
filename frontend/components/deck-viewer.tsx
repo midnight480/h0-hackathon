@@ -55,10 +55,13 @@ function OverlayBlock({
   block,
   lang,
   originalLanguage,
+  revision,
 }: {
   block: SlideBlock
   lang: LanguageCode
   originalLanguage: LanguageCode
+  // 画像ロード完了などで増える再フィット用シグナル
+  revision: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const text =
@@ -79,26 +82,24 @@ function OverlayBlock({
       el.scrollHeight <= el.clientHeight + 1 &&
       el.scrollWidth <= el.clientWidth + 1
 
-    const fit = () => {
-      apply(1)
-      if (fits()) return
-      let lo = MIN_MULT
-      let hi = 1
-      for (let i = 0; i < 8; i++) {
-        const mid = (lo + hi) / 2
-        apply(mid)
-        if (fits()) lo = mid
-        else hi = mid
-      }
-      apply(lo)
+    // フォントは cqh 単位なのでコンテナのリサイズには CSS 側で自動追従する。
+    // ブロック寸法（%）とフォント（cqh）が同じコンテナ基準でスケールするため、
+    // 収まるか否かはスケール不変 → 一度フィット係数を決めれば全サイズで有効。
+    // よってウィンドウリサイズ用の継続的な ResizeObserver は不要（自己監視による
+    // ResizeObserver ループ警告も回避）。text/baseFs 変化と画像ロード完了
+    // (revision) の時のみ、有効な高さで 1 回フィットすれば足りる。
+    apply(1)
+    if (fits()) return
+    let lo = MIN_MULT
+    let hi = 1
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2
+      apply(mid)
+      if (fits()) lo = mid
+      else hi = mid
     }
-
-    fit()
-    // コンテナ（画像）リサイズに追従して再フィット
-    const ro = new ResizeObserver(fit)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [text, baseFs])
+    apply(lo)
+  }, [text, baseFs, revision])
 
   if (!text) return null
 
@@ -159,6 +160,9 @@ export function DeckViewer({
   )
   // 表示モード：layout があれば既定で「重ねて表示」、無ければ従来のテキストパネル
   const [viewMode, setViewMode] = useState<ViewMode>(hasLayout ? 'overlay' : 'text')
+  // 画像ロード完了でインクリメントし、オーバーレイの再フィットを促すシグナル。
+  // 画像の自然高さが確定して初めて cqh が正しく解決されるため、ロード後に 1 回再計算する。
+  const [imgRev, setImgRev] = useState(0)
 
   const slide = deck.slides[index]
   const total = deck.slides.length
@@ -235,6 +239,7 @@ export function DeckViewer({
                 <img
                   src={slide?.imageUrl || '/placeholder.svg'}
                   alt={`Slide ${index + 1} of ${total}`}
+                  onLoad={() => setImgRev((r) => r + 1)}
                   className={
                     viewMode === 'overlay'
                       ? 'block h-auto w-full'
@@ -259,6 +264,7 @@ export function DeckViewer({
                           block={b}
                           lang={lang}
                           originalLanguage={deck.originalLanguage}
+                          revision={imgRev}
                         />
                       ))}
                     </div>
