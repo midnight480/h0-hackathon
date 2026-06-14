@@ -11,8 +11,8 @@ export async function GET(
   const { userId: viewerId } = await auth()
 
   const row = await withDb(async (client) => {
-    const { rows } = await client.query<{ user_id: string; slug: string; is_public: boolean | null }>(
-      `SELECT user_id, slug, is_public FROM decks
+    const { rows } = await client.query<{ user_id: string; username: string | null; slug: string; is_public: boolean | null }>(
+      `SELECT user_id, username, slug, is_public FROM decks
        WHERE short_id = $1 AND deleted_at IS NULL
        LIMIT 1`,
       [code],
@@ -26,5 +26,6 @@ export async function GET(
   if (row.is_public === false && viewerId !== row.user_id) notFound()
 
   // レガシー短縮URL（/s/{code}）は新URL形式（公開識別子の表示形 3-4-3）へ恒久リダイレクト（BR-6: 301相当）。
-  permanentRedirect(`/@${row.user_id}/${formatPublicId(row.slug)}`)
+  // 著者識別子は username（無ければ user_id へフォールバック）を用いる。
+  permanentRedirect(`/@${row.username ?? row.user_id}/${formatPublicId(row.slug)}`)
 }

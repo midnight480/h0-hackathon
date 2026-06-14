@@ -126,3 +126,11 @@
 **Context**: username-routing 要件承認。Workflow Planning/Functional Design は Web 側の実装に内包しハンドオフ。
 
 ---
+
+## Construction - Code Generation & Build and Test（username-routing 実装）
+**Timestamp**: 2026-06-13T13:00:00Z
+**User Input**: "（Claude Code Web タスク）公開URLの user 部分を Clerk username 化（Hiravi）。確定済み設計: DB非正規化（decks.username 追加・作成時保存＋バックフィル・username直接検索でClerk非呼出）、username不変ゆえ webhook同期なし、旧 user_ URLは username形式へ301、username空は user_id フォールバック。順序: スキーマ→作成時保存→ルーティング/301→表示置換→バックフィルスクリプト。"
+**AI Response**: 確定設計に従い実装。(1) `src/schema/schema.sql` に `username TEXT`＋`idx_decks_username` をべき等追加。(2) `frontend/app/actions/upload.ts` で Clerk から username 取得し INSERT に保存（不可は NULL）。(3) `frontend/app/[user]/[slug]/page.tsx` を再構成: `isUserId`(^user_) 判定で旧URLは所有者 username があれば 301、なければ user_id 表示（フォールバック）、username 形式は `decks.username` で直接検索。legacy_slug 寛容ルックアップ・可視性判定は維持。著者表示は解決後 user_id で Clerk から取得。(4) 表示/リンク username 化: `app/page.tsx`・`app/browse/page.tsx`・`app/dashboard/page.tsx`・`app/[user]/page.tsx`・関連デッキ・`app/s/[code]/route.ts`（`username ?? user_id`）。deck-card/deck-viewer は author.username 経由で変更不要。(5) 新規 `frontend/lib/username.ts`＋テスト。(6) バックフィル `src/scripts/backfill-username.ts`（distinct user_id ごとに Clerk REST で解決→一括 UPDATE・冪等）＋ `src/package.json` に `db:backfill-username` 登録。検証: vitest 8件 PASS、`frontend` `next build`（型チェック含む）成功。
+**Context**: Construction - Code Generation / Build and Test 完了（username-routing）。DSQL スキーマ適用＋バックフィル（midnight480）はマージ後に人間側で実行予定。
+
+---

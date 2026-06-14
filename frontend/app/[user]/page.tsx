@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import { clerkClient } from '@clerk/nextjs/server'
 import { Heart, Layers } from 'lucide-react'
@@ -8,10 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { withDb } from '@/lib/db'
 import { formatCount, languageLabel } from '@/lib/data'
+import { isUserId, normalizeUsername } from '@/lib/username'
 
 interface PublicDeck {
   id: string
   slug: string
+  username: string | null
   title: string
   original_language: string
   target_languages: string[] | string
@@ -27,26 +29,47 @@ export default async function UserPage({
   params: Promise<{ user: string }>
 }) {
   const { user } = await params
-  const userId = decodeURIComponent(user).replace(/^@/, '')
+  const raw = decodeURIComponent(user).replace(/^@/, '')
 
-  // Clerk からユーザー情報を取得
-  let displayName = ''
-  let avatarUrl = ''
-  try {
-    const clerk = await clerkClient()
-    const clerkUser = await clerk.users.getUser(userId)
-    displayName =
-      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
-      clerkUser.username ||
-      ''
-    avatarUrl = clerkUser.imageUrl ?? ''
-  } catch {
-    notFound()
+  // 所有者の user_id を確定する。
+  // - 旧URL（user_id 形式）: そのまま使用。
+  // - username 形式: Clerk を呼ばず DSQL で username → user_id を解決（NFR-1）。
+  let userId: string
+  if (isUserId(raw)) {
+    userId = raw
+  } else {
+    const resolved = await withDb(async (client) => {
+      const { rows } = await client.query<{ user_id: string }>(
+        `SELECT user_id FROM decks WHERE username = $1 AND deleted_at IS NULL LIMIT 1`,
+        [normalizeUsername(raw)],
+      )
+      return rows[0]?.user_id ?? null
+    }).catch(() => null)
+    if (!resolved) notFound()
+    userId = resolved
   }
+
+  // Clerk からプロフィール表示情報（氏名・アバター）を取得。
+  // permanentRedirect は内部的に NEXT_REDIRECT をスローするため try-catch では包まず、
+  // 取得失敗は .catch(() => null) で吸収してから判定する（try 内で呼ぶと握り潰され notFound() に流れる）。
+  const clerk = await clerkClient()
+  const clerkUser = await clerk.users.getUser(userId).catch(() => null)
+  if (!clerkUser) notFound()
+
+  // 旧URL（user_id 形式）でアクセスされ、かつ username が設定済みなら新URLへ 301（SEO/正規化）。
+  if (isUserId(raw) && clerkUser.username) {
+    permanentRedirect(`/@${normalizeUsername(clerkUser.username)}`)
+  }
+
+  const displayName =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
+    clerkUser.username ||
+    ''
+  const avatarUrl = clerkUser.imageUrl ?? ''
 
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<PublicDeck>(
-      `SELECT id, slug, title, original_language, target_languages,
+      `SELECT id, slug, username, title, original_language, target_languages,
               slide_count, views, likes, cover_image_key
        FROM decks
        WHERE user_id = $1
@@ -102,7 +125,7 @@ export default async function UserPage({
                 return (
                   <Link
                     key={deck.id}
-                    href={`/@${userId}/${deck.slug}`}
+                    href={`/@${deck.username ?? userId}/${deck.slug}`}
                     className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 transition-colors hover:border-accent/50 sm:p-4"
                   >
                     <div className="relative aspect-[16/10] w-28 shrink-0 overflow-hidden rounded-md bg-muted sm:w-36">

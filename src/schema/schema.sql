@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS decks (
     title         TEXT        NOT NULL,
     description   TEXT        NOT NULL DEFAULT '',
     user_id       TEXT        NOT NULL,
+    -- username: 公開URL `/@{user}/{slug}` の `{user}` 用に非正規化保存する Clerk username（小文字化）。
+    -- Clerk の Restrict changes=ON により不変のため陳腐化しない。未設定ユーザーは NULL（user_id へフォールバック）。
+    username      TEXT,
     category      TEXT        NOT NULL DEFAULT 'other',
     tags          JSONB       NOT NULL DEFAULT '[]',
     original_language  TEXT   NOT NULL DEFAULT 'en',
@@ -30,7 +33,9 @@ CREATE TABLE IF NOT EXISTS decks (
 );
 
 -- 既存テーブルへのべき等な列追加（apply-schema による再適用を想定）。
+-- CREATE TABLE IF NOT EXISTS だけでは既存テーブルに列が追加されないため、明示的に ALTER する。
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS legacy_slug TEXT;
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS username TEXT;
 
 CREATE TABLE IF NOT EXISTS slides (
     id           UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,3 +69,5 @@ CREATE INDEX ASYNC IF NOT EXISTS idx_slide_texts_slide_id ON slide_texts (slide_
 CREATE INDEX ASYNC IF NOT EXISTS idx_deck_likes_deck_id ON deck_likes (deck_id);
 -- 旧URLリダイレクト（legacy_slug 一致）検索用インデックス。
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_legacy_slug ON decks (legacy_slug);
+-- username による公開URL解決（Clerk API を呼ばず DSQL で直接検索）用インデックス。
+CREATE INDEX ASYNC IF NOT EXISTS idx_decks_username ON decks (username);

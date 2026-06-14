@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect } from 'next/navigation'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { normalizePublicId, isCanonicalId, formatPublicId } from '@/lib/public-id'
+import { isUserId, normalizeUsername } from '@/lib/username'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { DeckViewer } from '@/components/deck-viewer'
@@ -8,6 +9,10 @@ import { type Deck, type Slide, type LanguageCode } from '@/lib/data'
 import { withDb } from '@/lib/db'
 import { getClerkUsers } from '@/lib/clerk-users'
 import { hasLikedDeck } from '@/app/actions/deck'
+
+// 公開URLの所有者部分を解決する際の検索キー列。`user_id`（旧URL）または `username`（新URL）。
+// 値は固定リテラルのみを渡すため SQL インジェクションの懸念はない。
+type OwnerColumn = 'user_id' | 'username'
 
 async function getAuthorInfo(userId: string) {
   try {
@@ -24,10 +29,10 @@ async function getAuthorInfo(userId: string) {
 }
 
 async function getDeckFromDb(
-  userId: string,
+  ownerColumn: OwnerColumn,
+  ownerValue: string,
   slug: string,
   viewerId: string | null,
-  authorInfo?: { name: string; avatarUrl: string },
 ): Promise<Deck | null> {
   try {
     return await withDb(async (client) => {
@@ -38,6 +43,7 @@ async function getDeckFromDb(
         title: string
         description: string
         user_id: string
+        username: string | null
         category: string
         original_language: string
         target_languages: string[] | string
@@ -49,17 +55,20 @@ async function getDeckFromDb(
         cover_image_key: string | null
         published_at: string
       }>(
-        `SELECT id, slug, short_id, title, description, user_id, category, original_language,
+        `SELECT id, slug, short_id, title, description, user_id, username, category, original_language,
                 target_languages, slide_count, views, likes, status, is_public, cover_image_key, published_at
          FROM decks
-         WHERE user_id = $1 AND slug = $2 AND deleted_at IS NULL`,
-        [userId, slug],
+         WHERE ${ownerColumn} = $1 AND slug = $2 AND deleted_at IS NULL`,
+        [ownerValue, slug],
       )
       if (rows.length === 0) return null
       const d = rows[0]
 
       // 非公開（is_public = false）のデッキは所有者のみ閲覧可能
       if (d.is_public === false && viewerId !== d.user_id) return null
+
+      // 著者表示（氏名・アバター）は解決後の user_id で Clerk から取得する（表示用）。
+      const authorInfo = await getAuthorInfo(d.user_id)
 
       const { rows: slideRows } = await client.query<{
         page_number: number
@@ -107,7 +116,8 @@ async function getDeckFromDb(
         shortId: d.short_id ?? undefined,
         title: d.title,
         description: d.description,
-        author: { username: d.user_id, name: authorInfo?.name ?? d.user_id, avatarUrl: authorInfo?.avatarUrl ?? '' },
+        // 公開URL/リンク用の著者識別子は username（無ければ user_id へフォールバック）。
+        author: { username: d.username ?? d.user_id, name: authorInfo.name, avatarUrl: authorInfo.avatarUrl },
         category: d.category as Deck['category'],
         tags: [],
         originalLanguage: d.original_language as LanguageCode,
@@ -126,21 +136,61 @@ async function getDeckFromDb(
   }
 }
 
-// レガシー slug（旧タイトル由来URL）から現在の正規形 slug を引く。
-// 見つかれば新URLへリダイレクトするために使用する。
-async function getCanonicalSlugByLegacy(
-  userId: string,
-  legacySlug: string,
-): Promise<string | null> {
+// リダイレクト判定に使う所有者・可視性情報。
+type DeckOwner = { username: string | null; userId: string; isPublic: boolean | null }
+
+// 閲覧可能か判定する。公開（is_public が true / NULL）か、閲覧者が所有者なら可視。
+// 非公開デッキの旧URLを知る非所有者に対して、301 のリダイレクト先（username）や
+// デッキ存在を漏らさないため、リダイレクト前に必ずこの判定を通す。
+function isVisible(owner: DeckOwner, viewerId: string | null): boolean {
+  return owner.isPublic !== false || viewerId === owner.userId
+}
+
+// 正規形 slug で所有者デッキを引き、username・所有者・可視性を返す軽量ルックアップ。
+// 旧 user_id URL を username 形式へ 301 すべきか判定するために使う（Clerk は呼ばない）。
+async function lookupDeckOwner(
+  ownerColumn: OwnerColumn,
+  ownerValue: string,
+  slug: string,
+): Promise<DeckOwner | null> {
   try {
     return await withDb(async (client) => {
-      const { rows } = await client.query<{ slug: string }>(
-        `SELECT slug FROM decks
-         WHERE user_id = $1 AND legacy_slug = $2 AND deleted_at IS NULL
+      const { rows } = await client.query<{ username: string | null; user_id: string; is_public: boolean | null }>(
+        `SELECT username, user_id, is_public FROM decks
+         WHERE ${ownerColumn} = $1 AND slug = $2 AND deleted_at IS NULL
          LIMIT 1`,
-        [userId, legacySlug],
+        [ownerValue, slug],
       )
-      return rows[0]?.slug ?? null
+      return rows[0]
+        ? { username: rows[0].username ?? null, userId: rows[0].user_id, isPublic: rows[0].is_public }
+        : null
+    })
+  } catch {
+    return null
+  }
+}
+
+// レガシー slug（旧タイトル由来URL）から現在の正規形 slug と所有者・可視性を引く。
+// 見つかり、かつ可視な場合のみ新URLへリダイレクトするために使用する。
+async function getCanonicalSlugByLegacy(
+  ownerColumn: OwnerColumn,
+  ownerValue: string,
+  legacySlug: string,
+): Promise<{ canonicalSlug: string; owner: DeckOwner } | null> {
+  try {
+    return await withDb(async (client) => {
+      const { rows } = await client.query<{ slug: string; username: string | null; user_id: string; is_public: boolean | null }>(
+        `SELECT slug, username, user_id, is_public FROM decks
+         WHERE ${ownerColumn} = $1 AND legacy_slug = $2 AND deleted_at IS NULL
+         LIMIT 1`,
+        [ownerValue, legacySlug],
+      )
+      return rows[0]
+        ? {
+            canonicalSlug: rows[0].slug,
+            owner: { username: rows[0].username ?? null, userId: rows[0].user_id, isPublic: rows[0].is_public },
+          }
+        : null
     })
   } catch {
     return null
@@ -152,11 +202,11 @@ async function fetchRelated(deckId: string, category: string): Promise<Deck[]> {
     const rows = await withDb(async (client) => {
       const { rows } = await client.query<{
         id: string; slug: string; title: string; description: string
-        user_id: string; category: string; original_language: string
+        user_id: string; username: string | null; category: string; original_language: string
         target_languages: string[] | string; slide_count: number
         views: number; likes: number; cover_image_key: string | null; published_at: string
       }>(
-        `SELECT id, slug, title, description, user_id, category, original_language,
+        `SELECT id, slug, title, description, user_id, username, category, original_language,
                 target_languages, slide_count, views, likes, cover_image_key, published_at
          FROM decks
          WHERE id != $1 AND category = $2
@@ -179,7 +229,7 @@ async function fetchRelated(deckId: string, category: string): Promise<Deck[]> {
         ? r.target_languages : JSON.parse(r.target_languages as string)
       return {
         id: r.id, slug: r.slug, title: r.title, description: r.description,
-        author: { username: r.user_id, name: author.name, avatarUrl: author.avatarUrl },
+        author: { username: r.username ?? r.user_id, name: author.name, avatarUrl: author.avatarUrl },
         category: r.category as Deck['category'], tags: [],
         originalLanguage: r.original_language as LanguageCode,
         targetLanguages: targetLanguages as LanguageCode[],
@@ -200,27 +250,54 @@ export default async function DeckPage({
   params: Promise<{ user: string; slug: string }>
 }) {
   const { user, slug } = await params
-  const username = decodeURIComponent(user).replace(/^@/, '')
+  const raw = decodeURIComponent(user).replace(/^@/, '')
 
   const { userId: viewerId } = await auth()
-  const authorInfo = await getAuthorInfo(username)
 
   // 公開識別子を正規化（ハイフン除去・小文字化）。正規形なら slug で検索する。
   // 例: `abc-defg-hij` も `abcdefghij` も同一デッキに解決する。
   const normalized = normalizePublicId(slug)
   let deck: Deck | null = null
-  if (isCanonicalId(normalized)) {
-    deck = await getDeckFromDb(username, normalized, viewerId, authorInfo)
-  }
 
-  // 未ヒット時はレガシー slug（旧タイトルURL）として検索し、新URLへリダイレクト（301相当）。
-  if (!deck) {
-    const canonical = await getCanonicalSlugByLegacy(username, slug)
-    if (canonical) {
-      // 旧タイトルURL → 新URLへ恒久リダイレクト（BR-5: 301相当）
-      permanentRedirect(`/@${username}/${formatPublicId(canonical)}`)
+  if (isUserId(raw)) {
+    // ===== 旧URL（Clerk user_id 形式）=====
+    // 所有者に username があれば username 形式へ 301、無ければ user_id のまま表示（フォールバック）。
+    // ただし非公開デッキの存在・所有者 username を漏らさないため、可視（公開 or 所有者）な場合のみ。
+    if (isCanonicalId(normalized)) {
+      const owner = await lookupDeckOwner('user_id', raw, normalized)
+      if (owner && isVisible(owner, viewerId)) {
+        if (owner.username) {
+          permanentRedirect(`/@${owner.username}/${formatPublicId(normalized)}`)
+        }
+        // username 無し（フォールバック）→ user_id のまま表示
+        deck = await getDeckFromDb('user_id', raw, normalized, viewerId)
+      }
+      // 非公開・非所有者、または未ヒットは下の legacy 検索 → notFound に委ねる
     }
-    notFound()
+    if (!deck) {
+      // レガシー slug（旧タイトルURL）として検索。可視な場合のみ、username があれば username 形式へ、無ければ user_id のまま 301。
+      const legacy = await getCanonicalSlugByLegacy('user_id', raw, slug)
+      if (legacy && isVisible(legacy.owner, viewerId)) {
+        const target = legacy.owner.username ?? raw
+        permanentRedirect(`/@${target}/${formatPublicId(legacy.canonicalSlug)}`)
+      }
+      notFound()
+    }
+  } else {
+    // ===== username 形式（新URL）=====
+    const uname = normalizeUsername(raw)
+    if (isCanonicalId(normalized)) {
+      deck = await getDeckFromDb('username', uname, normalized, viewerId)
+    }
+    if (!deck) {
+      // 未ヒット時はレガシー slug（旧タイトルURL）として検索し、可視な場合のみ新URLへリダイレクト（BR-5: 301相当）。
+      // 非公開デッキの正規 slug を旧URL経由で漏らさないため、可視性を確認する。
+      const legacy = await getCanonicalSlugByLegacy('username', uname, slug)
+      if (legacy && isVisible(legacy.owner, viewerId)) {
+        permanentRedirect(`/@${raw}/${formatPublicId(legacy.canonicalSlug)}`)
+      }
+      notFound()
+    }
   }
 
   // スライドがまだない（pending/processing/failed）場合は処理中ページを表示

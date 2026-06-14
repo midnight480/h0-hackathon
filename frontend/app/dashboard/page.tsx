@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 interface DeckRow {
   id: string
   slug: string
+  username: string | null
   title: string
   original_language: string
   target_languages: string[]
@@ -79,8 +80,10 @@ function StatusBadge({ status, t }: { status: ProcessingStatus; t: TFunc }) {
   )
 }
 
-function DashRow({ deck, username, t }: { deck: DeckRow; username: string; t: TFunc }) {
+function DashRow({ deck, userId, t }: { deck: DeckRow; userId: string; t: TFunc }) {
   const ready = deck.status === 'ready'
+  // 公開URL用の著者識別子は username（無ければ user_id へフォールバック）。
+  const owner = deck.username ?? userId
   const region = process.env.NEXT_PUBLIC_AWS_REGION ?? 'us-east-1'
   const coverUrl = deck.cover_image_key
     ? `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${deck.cover_image_key}`
@@ -143,7 +146,7 @@ function DashRow({ deck, username, t }: { deck: DeckRow; username: string; t: TF
   )
 
   return ready ? (
-    <Link href={`/@${username}/${deck.slug}`} className="block">
+    <Link href={`/@${owner}/${deck.slug}`} className="block">
       {inner}
     </Link>
   ) : (
@@ -159,7 +162,7 @@ export default async function DashboardPage() {
 
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<DeckRow>(
-      `SELECT id, slug, title, original_language, target_languages,
+      `SELECT id, slug, username, title, original_language, target_languages,
               slide_count, views, likes, status, cover_image_key, published_at, is_public
        FROM decks
        WHERE user_id = $1 AND deleted_at IS NULL
@@ -234,7 +237,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {decks.map((deck) => (
-                  <DashRow key={deck.id} deck={deck} username={userId} t={t} />
+                  <DashRow key={deck.id} deck={deck} userId={userId} t={t} />
                 ))}
               </div>
             )}

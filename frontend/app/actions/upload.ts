@@ -3,11 +3,12 @@
 import { S3Client } from '@aws-sdk/client-s3'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { randomUUID } from 'crypto'
 import { withDb } from '@/lib/db'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
 import { generatePublicId, formatPublicId } from '@/lib/public-id'
+import { normalizeUsername } from '@/lib/username'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
 const sqs = new SQSClient({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -85,6 +86,16 @@ export async function createDeckRecord(params: {
     throw new Error('Invalid file key')
   }
 
+  // 認証ユーザーの username を Clerk から取得し、公開URL用に非正規化保存する。
+  // 取得不可（username 未設定など）の場合は NULL を保存し、閲覧時は user_id へフォールバックする。
+  let username: string | null = null
+  try {
+    const user = await (await clerkClient()).users.getUser(userId)
+    username = user.username ? normalizeUsername(user.username) : null
+  } catch {
+    username = null
+  }
+
   // 公開識別子（正規形10文字）を採番。UNIQUE/OCC 衝突時は新IDで再試行する。
   // short_id は新規採番せず NULL（旧URLリダイレクト専用列）。legacy_slug も新規は NULL。
   let lastErr: unknown
@@ -94,15 +105,16 @@ export async function createDeckRecord(params: {
       await withDb(async (client) => {
         await client.query(
           `INSERT INTO decks
-            (id, slug, legacy_slug, short_id, title, description, user_id, category,
+            (id, slug, legacy_slug, short_id, title, description, user_id, username, category,
              original_language, target_languages, file_key, status, is_public)
-           VALUES ($1, $2, NULL, NULL, $3, $4, $5, $6, $7, $8, $9, 'pending', false)`,
+           VALUES ($1, $2, NULL, NULL, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', false)`,
           [
             params.deckId,
             publicId,
             params.title,
             params.description,
             userId,
+            username,
             params.category,
             params.originalLanguage,
             JSON.stringify(params.targetLanguages),
