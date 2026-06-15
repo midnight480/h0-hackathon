@@ -21,7 +21,12 @@ Hiravi 自前 UI を **日本語 / 英語** の2言語に対応させる。ヘ�
 ## 2. アーキテクチャ決定
 
 - **方式**: 手書き辞書（外部ライブラリ追加なし）。パッケージマネージャは **pnpm**。
-- **ロケール保持**: Cookie `hiravi_locale`（値 `ja` / `en`、デフォルト `en` ＝現状維持）。
+- **ロケール保持**: Cookie `hiravi_locale`（値 `ja` / `en`）。
+- **ロケール解決の優先順位**: ①Cookie（ユーザーがトグルで明示選択した値） → ②ブラウザ言語（`Accept-Language` ヘッダーを q 値の降順でスキャンし、対応言語＝`ja`/`en`（`ja-JP` 等の地域サブタグ付き含む）に最初にマッチしたものを採用。同一 q 値はヘッダー記載順を維持） → ③デフォルト `en`。
+  - 第1優先がサポート外でも後続の対応言語を拾える（例: `Accept-Language: fr,ja;q=0.9` → `ja`）。
+  - 初回アクセス（Cookie 未設定）時はブラウザ言語で自動選択される。日本語ブラウザなら日本語、それ以外は英語。
+  - トグル操作で Cookie が書かれると以後そちらが最優先になるため、ブラウザ言語と異なる言語への切り替え（およびその逆）も可能。
+  - `Accept-Language` の読み取りはサーバ（`app/layout.tsx` → `getLocaleFromCookie()`）で行う。layout は既に Cookie を読むため動的レンダリングであり、追加コストはない。
 - **ルーティング変更なし**: URL に locale を付けない。`middleware` / `proxy.ts` は触らない。
 - **Clerk ミドルウェアに干渉しない**こと（共存設定が不要な構成を選んだ理由がこれ）。
 - **SSR 一貫性**: サーバ（`app/layout.tsx`）で Cookie を読み、対応する辞書を解決して Client Provider に渡す。両言語の辞書をクライアントに同梱しない。ハイドレーション不整合（チラつき）を出さない。
@@ -35,7 +40,7 @@ Hiravi 自前 UI を **日本語 / 英語** の2言語に対応させる。ヘ�
 | `frontend/lib/i18n/config.ts` | `locales = ['en','ja'] as const`、`defaultLocale = 'en'`、`Locale` 型、Cookie 名 `hiravi_locale` |
 | `frontend/lib/i18n/dictionaries/en.ts` | 英語辞書（ネストしたキー構造） |
 | `frontend/lib/i18n/dictionaries/ja.ts` | 日本語辞書（en と同一キー構造） |
-| `frontend/lib/i18n/index.ts` | サーバ用 `getDictionary(locale)`、`getLocaleFromCookie()` 等 |
+| `frontend/lib/i18n/index.ts` | サーバ用 `getDictionary(locale)`、`getLocaleFromCookie()`（Cookie 未設定時は `Accept-Language` でロケールを推定）等 |
 | `frontend/lib/i18n/locale-provider.tsx` | Client Context。`locale`・`t(key)`・`setLocale()` を供給。`t` はサーバから渡された辞書を引くだけ |
 | `frontend/app/actions/locale.ts` | Server Action `setLocale(locale)`：Cookie 書き込み（App Router ではサーバ側で書く）。呼び出し後 `router.refresh()` で SSR 再取得 |
 | `frontend/components/locale-toggle.tsx` | ヘッダーの JP/EN トグル UI |
@@ -100,6 +105,7 @@ Hiravi 自前 UI を **日本語 / 英語** の2言語に対応させる。ヘ�
 1. ヘッダーのトグルでスコープ内の全画面が JP ⇄ EN で即時切り替わる。
 2. リロード後もロケールが保持される（Cookie）。SSR と一致しハイドレーションのチラつきが出ない。
 3. `<html lang>` がロケールに追従する。
+3-1. 初回アクセス（Cookie 未設定）時、日本語ブラウザでは日本語、それ以外のブラウザでは英語が初期表示される。トグルで切り替えると Cookie が優先され、ブラウザ言語と異なる言語にも固定できる。
 4. **デッキ内容翻訳機能（`deck-viewer` の `lang`）は挙動不変**。
 5. **Clerk のサインイン/サインアップ・モーダルは影響を受けない**（英語のまま正常動作）。
 6. 法務3ページは JP/EN 両方が表示でき、日本語版に `要法務確認` コメントが入っている。
