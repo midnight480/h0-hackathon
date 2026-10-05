@@ -11,7 +11,7 @@ if (!ENDPOINT) {
 const REGION = process.env.AWS_REGION ?? "us-east-1";
 
 async function main() {
-  const signer = new DsqlSigner({ hostname: ENDPOINT, region: REGION });
+  const signer = new DsqlSigner({ hostname: ENDPOINT!, region: REGION });
   const token = await signer.getDbConnectAdminAuthToken();
 
   const client = new Client({
