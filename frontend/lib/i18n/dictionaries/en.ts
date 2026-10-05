@@ -135,6 +135,8 @@ export const en = {
     failedToLike: 'Failed to like',
     prevSlide: 'Previous slide',
     nextSlide: 'Next slide',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit fullscreen',
   },
 }
 

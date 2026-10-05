@@ -142,3 +142,27 @@
 **Context**: Operations - username-routing の本番 DSQL スキーマ変更（username列+index）とバックフィルを正常完了。認証情報は一時STS（要ローテーション）。
 
 ---
+
+## Requirements Analysis - デッキ個別OGP + ビューア改善（要求ログ）
+**Timestamp**: 2026-10-05T00:00:00Z
+**User Input**: "1. URLを共有するときに、作成されるOGPがデフォルトのままになってますと。で、スライドのURLを共有したときは、OGPのタイトルにはそのスライドの最初の初期で登録するときに設定しているタイトルと、その初期で登録している説明の文章と、あとスライドの1枚目をOGPの画像として取り扱うような形にしてください。 2. スライドの画面を開くとデフォルトオーバーレイで表示されるんですけど、これをデフォルトでオリジナルを選択するようにしてください。理由としては、日本語のスライドをそのオーバーレイデフォルトで日本語に出しちゃうと、そのスライドのもともと持っているフォントじゃなくなっているので、そこをまずはオリジナルの最初に見せるっていう感じ。で、必要に応じてオーバーレイとかで変える。 3. 今オーバーレイ、テキスト、オリジナルって並びますけど、オリジナル、テキスト、オーバーレイっていう順番で表示するのがいいかなというところです。 4. スライドを表示するっていうところに関しては、PDFとかを分解した画像たちを固定の枠で表示してると思うんです。じゃなくて、それを、それはそれを機能として残しつつ、拡大ボタン、右下に四角の枠のボタンとかを設定して、それを押すと全画面表示。で、全画面でその左右に移動できるような形の機能を引き続き追加してください。 以上をGitブランチ切ってコミットプッシュでメインにプルリクを作るという形ですね。"
+**AI Response**: ブラウンフィールドの既存機能改修と判定。既存コードを調査し、デッキページ（`app/[user]/[slug]/page.tsx`）に `generateMetadata` が無くルートレイアウトのデフォルトOGPが使われていること、ビューア（`components/deck-viewer.tsx`）の表示モード既定が `overlay`（layout有り時）でタブ順が `overlay/text/image` であることを確認。4要件とも既存コンポーネント境界内の改修であり、新規コンポーネント・スキーマ変更は不要。最小限深度の要件定義を作成し承認を求める。
+**Context**: Inception - Requirements Analysis。既存成果物（reverse-engineering）は流用。Request Type: Enhancement / Scope: frontend only / Complexity: Low。
+
+---
+
+## Requirements Analysis - 承認
+**Timestamp**: 2026-10-05T00:10:00Z
+**User Input**: "（AskUserQuestion 回答）承認して実装へ進む"
+**AI Response**: 要件定義 `aidlc-docs/inception/requirements/deck-ogp-viewer-requirements.md` が承認された。Workflow Planning は最小深度（単一コンポーネント・frontendのみ）のため実行計画は要件書内の成果物リストをもって確定とし、Construction へ進行。
+**Context**: Requirements Analysis 完了。User Stories/Application Design/Units Generation はスキップ（既存UIの改修のみ）。
+
+---
+
+## Construction - Code Generation & Build and Test（deck-ogp-viewer）
+**Timestamp**: 2026-10-05T00:40:00Z
+**User Input**: （承認済み要件に基づく実装）
+**AI Response**: 実装。(1) `app/[user]/[slug]/page.tsx` に `generateMetadata` と軽量ルックアップ `getDeckMetaForOg` を追加: デッキ title/description を og:title/og:description（twitter card も同内容・summary_large_image）、先頭スライド（page_number 最小・image_key 非NULL）の S3 URL を og:image。非公開デッキは null → 既定メタへフォールバック（情報漏洩防止）。画像無しは images 未設定でブランドOGP `opengraph-image.tsx` へフォールバック。正規 slug のみ対象（レガシー slug は既定メタ）。(2) `components/deck-viewer.tsx`: viewMode 初期値を `'image'`（オリジナル）に変更、タブ順を `image / text / overlay` に変更。(3) 全画面: スライド表示エリアを `slideAreaRef` で Fullscreen API 化。右下に四角枠ボタン（Maximize2/Minimize2 トグル）、`fullscreenchange` で状態同期、全画面中は黒背景で画像フィット表示（オーバーレイは inline-block ラッパで画像描画領域に厳密一致）、左右ボタン・キーボード矢印・左下ページ番号で操作可能。(4) i18n: `viewer.fullscreen`/`viewer.exitFullscreen` を日英辞書に追加。検証: `pnpm build`（型チェック含む）成功・vitest 8件 PASS。`pnpm lint` は eslint 未インストールのため不可（main からの既存状態）。
+**Context**: Construction 完了（deck-ogp-viewer）。ブランチ feature/deck-ogp-viewer、PR作成へ。
+
+---

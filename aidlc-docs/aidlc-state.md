@@ -3,9 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（username-routing 機能）
-- **Active Feature**: 公開URLの user 部分を Clerk username 化（DB非正規化・旧user_id URLは301・フォールバックあり）
-- **Completed Feature**: 公開識別子の Google Meet 形式ランダムID化（slug-identifier・実装＋本番DSQL移行 完了）
+- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（deck-ogp-viewer）
+- **Active Feature**: デッキ個別OGP＋ビューア改善（既定オリジナル・タブ順変更・全画面表示）
+- **Completed Feature**: 公開URLの user 部分を Clerk username 化 / 公開識別子の Google Meet 形式ランダムID化
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -70,6 +70,24 @@
 - バックフィル: `src/scripts/backfill-username.ts`（distinct user_id ごとに Clerk REST で username 解決→一括 UPDATE・冪等）。`src/package.json` に `db:backfill-username` 登録。
 - 検証: vitest 8件 PASS（public-id 5 + username 3）/ `frontend` `next build`（TypeScript 型チェック含む）成功。
 - 移行（人間側で実施）: `cd src && pnpm db:schema`（username 列追加）→ `pnpm db:backfill-username`（要 `CLERK_SECRET_KEY`・`DSQL_ENDPOINT`・AWS 認証情報）。
+
+## Construction Stage Progress — deck-ogp-viewer ユニット
+| Phase | Stage | Status |
+|-------|-------|--------|
+| CONSTRUCTION | Functional Design | [-] Skip（要件定義で確定済・新規コンポーネントなし） |
+| CONSTRUCTION | NFR Requirements | [-] Skip |
+| CONSTRUCTION | NFR Design | [-] Skip |
+| CONSTRUCTION | Infrastructure Design | [-] Skip |
+| CONSTRUCTION | Code Generation | [x] Completed |
+| CONSTRUCTION | Build and Test | [x] Completed |
+
+### 実装サマリ（deck-ogp-viewer）
+- OGP: `app/[user]/[slug]/page.tsx` に `generateMetadata` 追加。og:title=デッキ title、og:description=デッキ description、og:image=先頭スライド画像（なければ cover_image_key、それも無ければブランドOGPにフォールバック）。非公開デッキは既定メタのみ（漏洩防止）。
+- ビューア: 既定 viewMode を `image`（オリジナル）に変更、タブ順を image/text/overlay に変更。
+- 全画面: スライド表示エリア右下のボタンで Fullscreen API による全画面化。全画面中は左右ボタン/キーボード/ページ番号表示で移動可能、オーバーレイモードも位置ずれなく動作。
+- 変更ファイル: `frontend/app/[user]/[slug]/page.tsx`, `frontend/components/deck-viewer.tsx`, `frontend/lib/i18n/dictionaries/{en,ja}.ts`
+- 検証: `pnpm build`（型チェック含む）成功 / vitest 8件 PASS
+- 要件: `aidlc-docs/inception/requirements/deck-ogp-viewer-requirements.md`
 
 ## Extension Configuration
 (extensions/ ディレクトリは空のため、適用対象なし)
