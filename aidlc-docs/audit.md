@@ -166,3 +166,11 @@
 **Context**: Construction 完了（deck-ogp-viewer）。ブランチ feature/deck-ogp-viewer、PR作成へ。
 
 ---
+
+## Operations - 依存パッケージの脆弱性検査とバージョン更新
+**Timestamp**: 2026-10-05T01:00:00Z
+**User Input**: "あと、最近ちょっとパッケージの更新の処理とかやってないので、もし可能であれば、脆弱性とかを検査するためのパッケージ検査をした上で、必要に応じてパッケージのバージョンを上げてください。"
+**AI Response**: 検査と更新を実施。frontend(pnpm): `pnpm audit` で86件検出（critical 3・high 40・moderate 40・low 3）。`pnpm up` で範囲内全更新＋ `next 16.2.6→16.3.8`（Next.js critical 多数修正）・`typescript 5.7.3→5.9.3` を個別更新。結果 86→1 件（`braces` via shadcn CLI・上流未パッチ・devツール内のため残置）。`withSentryConfig` の非推奨importを `@sentry/nextjs/config` へ修正。src(npm): 5件検出（high 4・low 1）。`npm update` + `aws-cdk-lib 2.257→2.272.0`（OSコマンドインジェクション修正）・`aws-cdk 2.1144`・`constructs 10.8.1`・`@types/node 22.20.5`・`typescript 5.9.3`（pg-protocol の generic Buffer 対応に必要）。`brace-expansion` は aws-cdk-lib の bundled dep のため overrides 不可→残置（dev時CDK synthのみ・上流未修正）。`scripts/apply-schema.ts` の既存型エラー（envナローイングが関数境界を越えない問題）を `ENDPOINT!` で修正。検証: frontend `pnpm build`+vitest 8件 PASS、src `npm run build`（tsc）PASS。
+**Context**: Operations - 依存更新。残存脆弱性2件（frontend braces/src brace-expansion）は上流未修正のため許容残存として記録。ブランチ chore/package-updates（feature/deck-ogp-viewer からのスタック）。
+
+---
