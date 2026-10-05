@@ -25,6 +25,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // LAN 内の別端末（スマホ実機確認など）から dev サーバーへアクセスするための許可。
+  // dev server でのみ使われ、本番ビルドには影響しない。
+  allowedDevOrigins: ['192.168.10.23'],
   async headers() {
     return [
       {
