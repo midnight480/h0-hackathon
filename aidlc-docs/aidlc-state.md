@@ -3,8 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（deck-ogp-viewer）
-- **Active Feature**: デッキ個別OGP＋ビューア改善（既定オリジナル・タブ順変更・全画面表示）
+- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（ocr-url-import）
+- **Active Feature**: Issue #21 Textract OCR + 訂正UI / Issue #22 Google Slides URL 取り込み
+- **Completed Feature**: デッキ個別OGP＋ビューア改善（既定オリジナル・タブ順変更・全画面表示）
 - **Completed Feature**: 公開URLの user 部分を Clerk username 化 / 公開識別子の Google Meet 形式ランダムID化
 
 ## Workspace State
@@ -90,4 +91,24 @@
 - 要件: `aidlc-docs/inception/requirements/deck-ogp-viewer-requirements.md`
 
 ## Extension Configuration
-(extensions/ ディレクトリは空のため、適用対象なし)
+| Extension | Enabled | Decided At |
+|---|---|---|
+| Security Baseline | No | Requirements Analysis (ocr-url-import) |
+| Property-Based Testing | No | Requirements Analysis (ocr-url-import) |
+
+## Construction Stage Progress — ocr-url-import ユニット群
+| Phase | Stage | Status |
+|-------|-------|--------|
+| CONSTRUCTION | Functional Design | [x] Completed（unit-ocr / unit-text-correction 軽量設計。unit-gslides-import は定型のためスキップ） |
+| CONSTRUCTION | NFR Requirements | [-] Skip |
+| CONSTRUCTION | NFR Design | [-] Skip |
+| CONSTRUCTION | Infrastructure Design | [-] Skip |
+| CONSTRUCTION | Code Generation | [x] Completed |
+| CONSTRUCTION | Build and Test | [x] Completed |
+
+### 実装サマリ（ocr-url-import）
+- **unit-ocr（#21）**: `src/lambda/processing/handler.py` に `apply_ocr_fallback()` 追加。テキストレイヤー・オーバーレイブロック双方が空のページのみ同期 `DetectDocumentText`（PNG バイト列、5MB 上限で倍率縮小）を実行し、LINE ブロックを既存オーバーレイスキーマ（bbox/fs/bg/t.original）へマップ。`OCR_ENABLED`/`OCR_MAX_PAGES`（既定 100）で制御。Textract IAM は `src/lib/translate-stack.ts` に追加（Translate/Comprehend と同スタック）。
+- **unit-gslides-import（#22）**: `frontend/lib/gslides.ts`（URL→プレゼンIDパース）+ `frontend/app/actions/import.ts`（Drive API `files.get`/`files.export`+`GOOGLE_API_KEY`、magic bytes・サイズ検証、`uploads/{deckId}/imported.pdf` へ PutObject）。アップロードページに URL 入力・共有ヒント・権利同意チェック追加。タイトル未入力時は Drive のファイル名を使用。
+- **unit-text-correction（#21 訂正UI）**: `app/[user]/[slug]/edit/page.tsx`（所有者限定・正規 slug のみ）+ `components/slide-text-editor.tsx`（ブロック単位/スライド単位 textarea + 保存）+ `app/actions/slide-text.ts`（`updateSlideText`：所有権検証→ブロック/スライドテキスト更新→`@aws-sdk/client-translate` で target_languages 再翻訳→DSQL 更新→revalidatePath）。`DeckViewer` に `isOwner` 時のみ「テキストを編集」ボタン、`Deck` 型に `ownerId` 追加。
+- **検証**: vitest 26件 PASS（gslides パース18件追加）/ frontend `pnpm build` 成功 / src `npm run build`（tsc）成功 / handler.py `py_compile` OK。
+- **デプロイ前提（ユーザー作業）**: GCP で Drive API 有効化 + API キーを `GOOGLE_API_KEY` として env/Vercel へ設定、フロントエンド用 AWS 認証情報に `translate:TranslateText` 付与、`cd src && npm run deploy`。

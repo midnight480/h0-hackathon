@@ -95,6 +95,24 @@ export const ja: Dictionary = {
     toastNeedTitle: 'デッキにタイトルを付けてください',
     toastSuccess: 'デッキをアップロードしました — 翻訳を実行中です',
     toastFailed: 'アップロードに失敗しました。もう一度お試しください。',
+    importDivider: 'または',
+    gslidesLabel: 'Google Slides の URL から取り込む',
+    gslidesHint:
+      'プレゼンテーションは「リンクを知っている全員」で共有されている必要があります。',
+    consentLabel:
+      'このコンテンツをインポート・公開する権利を持っていることを確認しました。',
+    toastNeedConsent:
+      'デッキを取り込む権利があることを確認してください。',
+    importError: {
+      unavailable: 'URL 取り込みがサーバー側で設定されていません。',
+      invalidUrl: 'Google Slides の URL ではありません。',
+      notGoogleSlides: 'リンク先が Google スライドではありません。',
+      restricted:
+        'プレゼンテーションにアクセスできません。共有設定を「リンクを知っている全員」に変更してから再度お試しください。',
+      notPdf: 'エクスポートされたファイルが有効な PDF ではありませんでした。',
+      tooLarge: 'エクスポートされた PDF が大きすぎます。最大サイズは {limit} です。',
+      fetchFailed: 'プレゼンテーションの取得に失敗しました。もう一度お試しください。',
+    },
   },
   browse: {
     title: 'デッキを探す',
@@ -140,5 +158,22 @@ export const ja: Dictionary = {
     nextSlide: '次のスライド',
     fullscreen: '全画面表示',
     exitFullscreen: '全画面を終了',
+    editText: 'テキストを編集',
+  },
+  editor: {
+    title: 'スライドテキストの編集',
+    subtitle:
+      '「{title}」の抽出・OCR 済みテキストを修正します。保存するとスライドが再翻訳されます。',
+    backToDeck: 'デッキに戻る',
+    slideLabel: 'スライド {n}',
+    slideAlt: 'スライド {n}',
+    slideTextLabel: 'スライドテキスト',
+    blockLabel: 'ブロック {n}',
+    emptySlide: '抽出されたテキストはありません — ここに入力できます。',
+    noSlides: 'スライドが見つかりません。',
+    save: '保存して再翻訳',
+    saving: '保存中…',
+    saved: '保存して再翻訳しました',
+    saveFailed: '保存に失敗しました。もう一度お試しください。',
   },
 }

@@ -93,6 +93,24 @@ export const en = {
     toastNeedTitle: 'Give your deck a title',
     toastSuccess: 'Deck uploaded — translation in progress',
     toastFailed: 'Upload failed. Please try again.',
+    importDivider: 'or',
+    gslidesLabel: 'Import from a Google Slides URL',
+    gslidesHint:
+      'The presentation must be shared as “Anyone with the link”.',
+    consentLabel:
+      'I own this content or have permission to import and publish it.',
+    toastNeedConsent:
+      'Please confirm you have the rights to import this deck.',
+    importError: {
+      unavailable: 'URL import is not configured on this server.',
+      invalidUrl: 'That is not a valid Google Slides URL.',
+      notGoogleSlides: 'The link does not point to a Google Slides presentation.',
+      restricted:
+        'Could not access the presentation. Set sharing to “Anyone with the link” and try again.',
+      notPdf: 'The exported file was not a valid PDF.',
+      tooLarge: 'The exported PDF is too large. Maximum size is {limit}.',
+      fetchFailed: 'Failed to fetch the presentation. Please try again.',
+    },
   },
   browse: {
     title: 'Browse decks',
@@ -138,6 +156,23 @@ export const en = {
     nextSlide: 'Next slide',
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit fullscreen',
+    editText: 'Edit text',
+  },
+  editor: {
+    title: 'Edit slide text',
+    subtitle:
+      'Fix extracted or OCR’d text for “{title}”. Saving re-translates the slide.',
+    backToDeck: 'Back to deck',
+    slideLabel: 'Slide {n}',
+    slideAlt: 'Slide {n}',
+    slideTextLabel: 'Slide text',
+    blockLabel: 'Block {n}',
+    emptySlide: 'No extracted text — you can type it here.',
+    noSlides: 'No slides found.',
+    save: 'Save & re-translate',
+    saving: 'Saving…',
+    saved: 'Saved and re-translated',
+    saveFailed: 'Failed to save. Please try again.',
   },
 }
 

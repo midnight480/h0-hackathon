@@ -6,6 +6,7 @@ import {
   Check,
   FileText,
   Globe,
+  Link2,
   Loader2,
   UploadCloud,
   X,
@@ -29,6 +30,7 @@ import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from '@/lib/upload-limits'
 import { useT } from '@/lib/i18n/locale-provider'
 import { cn } from '@/lib/utils'
 import { getPresignedUploadUrl, createDeckRecord, enqueueProcessing } from '@/app/actions/upload'
+import { importFromGoogleSlides } from '@/app/actions/import'
 
 export default function UploadPage() {
   const router = useRouter()
@@ -41,6 +43,8 @@ export default function UploadPage() {
   const [category, setCategory] = useState('tech')
   const [original, setOriginal] = useState<LanguageCode>('en')
   const [targets, setTargets] = useState<LanguageCode[]>(['ja', 'zh'])
+  const [gsUrl, setGsUrl] = useState('')
+  const [consent, setConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const handleFiles = (files: FileList | null) => {
@@ -66,31 +70,58 @@ export default function UploadPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return toast.error(t('upload.toastAddPdf'))
-    if (file.size > MAX_UPLOAD_BYTES) {
-      return toast.error(t('upload.toastTooLarge', { limit: MAX_UPLOAD_LABEL }))
+    const useGslides = gsUrl.trim().length > 0
+    if (!useGslides) {
+      if (!file) return toast.error(t('upload.toastAddPdf'))
+      if (file.size > MAX_UPLOAD_BYTES) {
+        return toast.error(t('upload.toastTooLarge', { limit: MAX_UPLOAD_LABEL }))
+      }
     }
-    if (!title.trim()) return toast.error(t('upload.toastNeedTitle'))
+    if (useGslides && !consent) {
+      return toast.error(t('upload.toastNeedConsent'))
+    }
     setSubmitting(true)
 
     try {
-      // 1. presigned POST を取得
-      const { url, fields, key, deckId } = await getPresignedUploadUrl(file.name, file.type)
+      let deckId: string
+      let fileKey: string
+      let deckTitle = title.trim()
 
-      // 2. S3 に直接アップロード（multipart/form-data POST）
-      //    fields は presigned POST の署名・ポリシーを含む。file は必ず最後に append する。
-      const formData = new FormData()
-      Object.entries(fields).forEach(([k, v]) => formData.append(k, v as string))
-      formData.append('file', file)
+      if (useGslides) {
+        // Google Slides: Drive API で PDF をサーバー側取得 → S3 保存済み
+        const res = await importFromGoogleSlides(gsUrl.trim())
+        if (!res.ok) {
+          toast.error(
+            t(`upload.importError.${res.code}`, { limit: MAX_UPLOAD_LABEL }),
+          )
+          return
+        }
+        deckId = res.deckId
+        fileKey = res.fileKey
+        if (!deckTitle) deckTitle = res.suggestedTitle
+      } else {
+        // 1. presigned POST を取得
+        const presigned = await getPresignedUploadUrl(file!.name, file!.type)
+        deckId = presigned.deckId
+        fileKey = presigned.key
 
-      const uploadRes = await fetch(url, { method: 'POST', body: formData })
-      if (!uploadRes.ok) throw new Error(`S3 upload failed: ${uploadRes.status}`)
+        // 2. S3 に直接アップロード（multipart/form-data POST）
+        //    fields は presigned POST の署名・ポリシーを含む。file は必ず最後に append する。
+        const formData = new FormData()
+        Object.entries(presigned.fields).forEach(([k, v]) => formData.append(k, v as string))
+        formData.append('file', file!)
+
+        const uploadRes = await fetch(presigned.url, { method: 'POST', body: formData })
+        if (!uploadRes.ok) throw new Error(`S3 upload failed: ${uploadRes.status}`)
+      }
+
+      if (!deckTitle) return toast.error(t('upload.toastNeedTitle'))
 
       // 3. DSQL にデッキレコードを登録
       await createDeckRecord({
         deckId,
-        fileKey: key,
-        title: title.trim(),
+        fileKey,
+        title: deckTitle,
         description: description.trim(),
         category,
         originalLanguage: original,
@@ -100,9 +131,9 @@ export default function UploadPage() {
       // 4. SQS に処理ジョブを登録
       await enqueueProcessing({
         deckId,
-        fileKey: key,
+        fileKey,
         targetLanguages: targets,
-        title: title.trim(),
+        title: deckTitle,
         description: description.trim(),
         category,
         originalLanguage: original,
@@ -197,6 +228,45 @@ export default function UploadPage() {
                 </Button>
               </div>
             )}
+
+            {/* Google Slides import */}
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">
+                {t('upload.importDivider')}
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label
+                htmlFor="gslides-url"
+                className="flex items-center gap-2"
+              >
+                <Link2 className="size-4 text-accent" />
+                {t('upload.gslidesLabel')}
+              </Label>
+              <Input
+                id="gslides-url"
+                type="url"
+                value={gsUrl}
+                onChange={(e) => setGsUrl(e.target.value)}
+                placeholder="https://docs.google.com/presentation/d/…"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('upload.gslidesHint')}
+              </p>
+              {gsUrl.trim() && (
+                <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-1 accent-accent"
+                  />
+                  {t('upload.consentLabel')}
+                </label>
+              )}
+            </div>
 
             {/* Metadata */}
             <div className="flex flex-col gap-5">

@@ -41,5 +41,18 @@ export class HiraviTranslateStack extends cdk.Stack {
         resources: ["*"],
       })
     );
+
+    // Amazon Textract（画像のみ PDF の OCR フォールバック用）
+    // DetectDocumentText はリソースレベル権限をサポートしないため "*" を使用
+    props.processingFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "TextractOcr",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "textract:DetectDocumentText",
+        ],
+        resources: ["*"],
+      })
+    );
   }
 }

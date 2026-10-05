@@ -9,6 +9,7 @@ import {
   Languages,
   Maximize2,
   Minimize2,
+  Pencil,
   Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -141,10 +142,13 @@ export function DeckViewer({
   deck,
   related,
   initialLiked = false,
+  isOwner = false,
 }: {
   deck: Deck
   related: Deck[]
   initialLiked?: boolean
+  // デッキ所有者向けの編集導線（テキスト訂正ページ）を表示するか
+  isOwner?: boolean
 }) {
   const t = useT()
   const available: LanguageCode[] = [...new Set([deck.originalLanguage, ...deck.targetLanguages])]
@@ -484,6 +488,14 @@ export function DeckViewer({
               <Share2 className="size-4" />
               {t('viewer.share')}
             </Button>
+            {isOwner && (
+              <Button variant="outline" className="flex-1 gap-2" asChild>
+                <Link href={`/@${deck.author.username}/${deck.slug}/edit`}>
+                  <Pencil className="size-4" />
+                  {t('viewer.editText')}
+                </Link>
+              </Button>
+            )}
           </div>
 
           {/* Author */}

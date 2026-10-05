@@ -150,6 +150,7 @@ async function getDeckFromDb(
         publishedAt: d.published_at,
         cover: d.cover_image_key ? `${s3Base}/${d.cover_image_key}` : '/placeholder.svg',
         slides,
+        ownerId: d.user_id,
       }
     })
   } catch {
@@ -426,7 +427,12 @@ export default async function DeckPage({
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
       <main className="flex-1">
-        <DeckViewer deck={deck} related={related} initialLiked={initialLiked} />
+        <DeckViewer
+          deck={deck}
+          related={related}
+          initialLiked={initialLiked}
+          isOwner={viewerId === deck.ownerId}
+        />
       </main>
       <SiteFooter />
     </div>
