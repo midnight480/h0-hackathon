@@ -138,5 +138,7 @@ export const ja: Dictionary = {
     failedToLike: 'いいねに失敗しました',
     prevSlide: '前のスライド',
     nextSlide: '次のスライド',
+    fullscreen: '全画面表示',
+    exitFullscreen: '全画面を終了',
   },
 }

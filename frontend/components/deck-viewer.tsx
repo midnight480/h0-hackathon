@@ -8,6 +8,7 @@ import {
   Heart,
   Languages,
   Maximize2,
+  Minimize2,
   Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -158,11 +159,31 @@ export function DeckViewer({
     () => deck.slides.some((s) => (s.layout?.length ?? 0) > 0),
     [deck.slides],
   )
-  // 表示モード：layout があれば既定で「重ねて表示」、無ければ従来のテキストパネル
-  const [viewMode, setViewMode] = useState<ViewMode>(hasLayout ? 'overlay' : 'text')
+  // 表示モード：既定は「元のスライド」（元PDFのフォントをそのまま見せるため）。
+  // 翻訳が必要な場合にユーザーがオーバーレイ／テキストへ切り替える。
+  const [viewMode, setViewMode] = useState<ViewMode>('image')
   // 画像ロード完了でインクリメントし、オーバーレイの再フィットを促すシグナル。
   // 画像の自然高さが確定して初めて cqh が正しく解決されるため、ロード後に 1 回再計算する。
   const [imgRev, setImgRev] = useState(0)
+
+  // 全画面表示（Fullscreen API）。スライド表示エリアを全画面化し、
+  // Esc・ブラウザUI等での解除も fullscreenchange で拾って状態を同期する。
+  const slideAreaRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen()
+    } else {
+      void slideAreaRef.current?.requestFullscreen()
+    }
+  }
 
   const slide = deck.slides[index]
   const total = deck.slides.length
@@ -214,6 +235,8 @@ export function DeckViewer({
         {/* Viewer column */}
         <div>
           <div className="overflow-hidden rounded-xl border border-border bg-card">
+            {/* 全画面化の対象。全画面時はこの要素が top layer で画面全体に広がる。 */}
+            <div ref={slideAreaRef} className="relative">
             {(() => {
               const navButtons = (
                 <>
@@ -235,6 +258,22 @@ export function DeckViewer({
                   </button>
                 </>
               )
+              // スライド表示エリア右下の全画面トグル（全画面中は終了アイコン）
+              const fullscreenButton = (
+                <button
+                  onClick={toggleFullscreen}
+                  aria-label={isFullscreen ? t('viewer.exitFullscreen') : t('viewer.fullscreen')}
+                  className="absolute bottom-3 right-3 rounded-md bg-background/90 p-2 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
+                >
+                  {isFullscreen ? <Minimize2 className="size-5" /> : <Maximize2 className="size-5" />}
+                </button>
+              )
+              // 全画面中のみ、左下にページ番号を重ねて表示
+              const fsCounter = isFullscreen ? (
+                <span className="absolute bottom-3 left-3 rounded-md bg-background/90 px-2.5 py-1.5 text-sm font-medium tabular-nums text-foreground shadow-sm backdrop-blur">
+                  {index + 1} / {total}
+                </span>
+              ) : null
               const img = (
                 <img
                   src={slide?.imageUrl || '/placeholder.svg'}
@@ -242,8 +281,12 @@ export function DeckViewer({
                   onLoad={() => setImgRev((r) => r + 1)}
                   className={
                     viewMode === 'overlay'
-                      ? 'block h-auto w-full'
-                      : 'size-full object-contain'
+                      ? isFullscreen
+                        ? 'block h-auto max-h-[100dvh] w-auto max-w-[100dvw]'
+                        : 'block h-auto w-full'
+                      : isFullscreen
+                        ? 'max-h-full max-w-full object-contain'
+                        : 'size-full object-contain'
                   }
                 />
               )
@@ -251,34 +294,65 @@ export function DeckViewer({
                 // 元画像の実描画領域にぴったり重ねる（レターボックス無しの自然アスペクト）。
                 // オーバーレイ層は absolute inset-0 で画像と同寸になり、container-type:size で
                 // cqh/cqw が画像高さ・幅基準で解決される。
+                // 全画面時は画像を画面にフィットさせるため、inline-block の内側ラッパで
+                // 描画サイズに合わせてオーバーレイ層を重ねる。
+                const overlayLayer = (
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{ containerType: 'size' }}
+                  >
+                    {(slide?.layout ?? []).map((b, i) => (
+                      <OverlayBlock
+                        key={i}
+                        block={b}
+                        lang={lang}
+                        originalLanguage={deck.originalLanguage}
+                        revision={imgRev}
+                      />
+                    ))}
+                  </div>
+                )
                 return (
-                  <div className="relative bg-muted">
-                    {img}
-                    <div
-                      className="pointer-events-none absolute inset-0"
-                      style={{ containerType: 'size' }}
-                    >
-                      {(slide?.layout ?? []).map((b, i) => (
-                        <OverlayBlock
-                          key={i}
-                          block={b}
-                          lang={lang}
-                          originalLanguage={deck.originalLanguage}
-                          revision={imgRev}
-                        />
-                      ))}
-                    </div>
+                  <div
+                    className={cn(
+                      'relative bg-muted',
+                      isFullscreen && 'flex h-full items-center justify-center bg-black',
+                    )}
+                  >
+                    {isFullscreen ? (
+                      <div className="relative inline-block">
+                        {img}
+                        {overlayLayer}
+                      </div>
+                    ) : (
+                      <>
+                        {img}
+                        {overlayLayer}
+                      </>
+                    )}
                     {navButtons}
+                    {fullscreenButton}
+                    {fsCounter}
                   </div>
                 )
               }
               return (
-                <div className="relative aspect-[16/10] bg-muted">
+                <div
+                  className={cn(
+                    'relative bg-muted',
+                    isFullscreen
+                      ? 'flex h-full items-center justify-center bg-black'
+                      : 'aspect-[16/10]',
+                  )}
+                >
                   {img}
                   {navButtons}
+                  {fullscreenButton}
+                  {fsCounter}
                 </div>
               )
             })()}
+            </div>
 
             {/* Controls bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
@@ -314,7 +388,7 @@ export function DeckViewer({
                   role="group"
                   aria-label={t('viewer.viewMode')}
                 >
-                  {(['overlay', 'text', 'image'] as ViewMode[]).map((m) => (
+                  {(['image', 'text', 'overlay'] as ViewMode[]).map((m) => (
                     <Button
                       key={m}
                       variant={viewMode === m ? 'default' : 'ghost'}

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { normalizePublicId, isCanonicalId, formatPublicId } from '@/lib/public-id'
@@ -214,6 +215,84 @@ async function getCanonicalSlugByLegacy(
     })
   } catch {
     return null
+  }
+}
+
+// OGP 用の軽量メタルックアップ。タイトル・説明・先頭スライド画像を取得する。
+// 非公開デッキ（is_public = false）は null を返し、タイトル・説明・画像を OGP に出力しない。
+async function getDeckMetaForOg(
+  ownerColumn: OwnerColumn,
+  ownerValue: string,
+  slug: string,
+): Promise<{ title: string; description: string; imageUrl: string | null } | null> {
+  try {
+    return await withDb(async (client) => {
+      const { rows } = await client.query<{
+        title: string
+        description: string
+        is_public: boolean | null
+        cover_image_key: string | null
+        image_key: string | null
+      }>(
+        `SELECT d.title, d.description, d.is_public, d.cover_image_key,
+                (SELECT s.image_key FROM slides s
+                 WHERE s.deck_id = d.id AND s.image_key IS NOT NULL
+                 ORDER BY s.page_number LIMIT 1) AS image_key
+         FROM decks d
+         WHERE d.${ownerColumn} = $1 AND d.slug = $2 AND d.deleted_at IS NULL
+         LIMIT 1`,
+        [ownerValue, slug],
+      )
+      const d = rows[0]
+      if (!d || d.is_public === false) return null
+      const region = process.env.NEXT_PUBLIC_AWS_REGION ?? 'us-east-1'
+      const bucket = process.env.NEXT_PUBLIC_S3_BUCKET_NAME ?? ''
+      const s3Base = `https://${bucket}.s3.${region}.amazonaws.com`
+      const imageKey = d.image_key ?? d.cover_image_key
+      return {
+        title: d.title,
+        description: d.description,
+        imageUrl: imageKey ? `${s3Base}/${imageKey}` : null,
+      }
+    })
+  } catch {
+    return null
+  }
+}
+
+// デッキ固有の OGP/Twitter カードを返す。未ヒット・非公開・旧URL形式の場合は
+// 空オブジェクトを返し、ルートレイアウトの既定メタ（ブランドOGP）にフォールバックする。
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ user: string; slug: string }>
+}): Promise<Metadata> {
+  const { user, slug } = await params
+  const raw = decodeURIComponent(user).replace(/^@/, '')
+  const normalized = normalizePublicId(slug)
+  if (!isCanonicalId(normalized)) return {}
+
+  const ownerColumn: OwnerColumn = isUserId(raw) ? 'user_id' : 'username'
+  const ownerValue = isUserId(raw) ? raw : normalizeUsername(raw)
+  const meta = await getDeckMetaForOg(ownerColumn, ownerValue, normalized)
+  if (!meta) return {}
+
+  const description = meta.description || undefined
+  const images = meta.imageUrl ? [meta.imageUrl] : undefined
+  return {
+    title: meta.title,
+    description,
+    openGraph: {
+      title: meta.title,
+      description,
+      images,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: meta.title,
+      description,
+      images,
+    },
   }
 }
 
