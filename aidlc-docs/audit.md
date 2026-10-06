@@ -213,3 +213,20 @@
 **User Input**: "アップロードしているデッキごとに、アクセスView数を出すことはできますか？" → 調査回答後の設計確認に対し「所有者自身の閲覧を除外」「ユニークカウント」「Bot除外（クライアントbeacon方式）」の3点を明示的に採用。
 **AI Response**: 現状調査の結果、`decks.views` カラムは存在し SELECT・`ORDER BY views DESC` で利用済みだが、インクリメント処理と画面表示が未実装であることを確認。当初設計（PROMPT.md）では INSERT-only の `deck_views` イベントテーブル構想あり。既存 aidlc-state.md・RE 成果物ありのブラウンフィールドのため Reverse Engineering はスキップし Requirements Analysis へ。
 **Context**: Request Type: Enhancement / Scope: frontend（Route Handler・表示）+ schema / Complexity: Low〜Medium。進行中の OCR フィーチャー（feat/ocr-gslides-import ブランチ・未コミット変更あり）とは別フィーチャーとして扱う。
+
+## Requirements Analysis - 要件定義生成・承認（deck-view-count）
+**Timestamp**: 2026-10-05T05:10:00Z
+**User Input**: "（設計確認への回答）所有者除外=いる / ユニークカウント=いる / Bot除外=いる → deck_views テーブル方式 / 表示はダッシュボードのみ" → 「はい」（要件承認）
+**AI Response**: 質問・回答を deck-view-count-questions.md に記録し、要件定義 deck-view-count-requirements.md を生成。方針確定: ユニークカウント（deck_views 複合主キーで重複排除）・所有者除外・クライアントbeacon方式・表示はダッシュボードのみ。変更5ファイル＋テスト。User Stories/Application Design/Units Generation はスキップ相当（単一ユニット・新規コンポーネントは小規模）。Functional Design は要件定義で確定済みのためスキップし Code Generation へ。
+**Context**: Requirements Approved。Risk: Low。
+
+## Construction - Code Generation / Build and Test（deck-view-count）
+**Timestamp**: 2026-10-05T05:20:00Z
+**AI Response**: 実装完了。変更: `src/schema/schema.sql`（deck_views テーブル＋idx_deck_views_deck_id）、`frontend/app/api/decks/[deckId]/view/route.ts`（新規 POST）、`frontend/components/view-tracker.tsx`（新規 beacon 計測）、`frontend/app/[user]/[slug]/page.tsx`（ViewTracker マウント）、`frontend/app/dashboard/page.tsx`（views SELECT・Eye アイコン表示）、`frontend/lib/viewer-id.ts` + `.test.ts`（新規）。ユニーク判定は deck_views 複合主キー（23505 で既視聴スキップ）、所有者・非公開非所有者はカウント除外、クライアント beacon のみ発火で Bot 除外。検証: vitest 29件 PASS / `pnpm build` 成功。残: `pnpm db:schema` で deck_views 作成（ユーザー作業）。
+**Context**: Build and Test 完了。Functional Design/NFR/Infrastructure Design はスキップ（要件定義で確定済・小規模）。
+
+## Operations - スキーマ適用（deck_views）
+**Timestamp**: 2026-10-06T00:10:00Z
+**User Input**: AWS SSO 一時認証情報を提供し `pnpm db:schema` 実行を許可
+**AI Response**: `frontend/.env.local` の `DSQL_ENDPOINT`（us-east-1）を使用し `cd src && pnpm db:schema` を実行。`deck_views` テーブルと `idx_deck_views_deck_id`（ASYNC）を含む全ステートメントが正常適用。View 計測の DB 側前提が完了。
+**Context**: deck-view-count のデプロイ前提タスク解消。残りはフロントエンドのデプロイのみ。

@@ -6,6 +6,7 @@ import { isUserId, normalizeUsername } from '@/lib/username'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { DeckViewer } from '@/components/deck-viewer'
+import { ViewTracker } from '@/components/view-tracker'
 import { type Deck, type Slide, type SlideBlock, type LanguageCode } from '@/lib/data'
 import { withDb } from '@/lib/db'
 import { getClerkUsers } from '@/lib/clerk-users'
@@ -427,6 +428,7 @@ export default async function DeckPage({
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
       <main className="flex-1">
+        <ViewTracker deckId={deck.id} />
         <DeckViewer
           deck={deck}
           related={related}

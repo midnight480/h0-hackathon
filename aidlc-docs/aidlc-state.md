@@ -3,8 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（ocr-url-import）
-- **Active Feature**: Issue #21 Textract OCR + 訂正UI / Issue #22 Google Slides URL 取り込み
+- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（deck-view-count）
+- **Active Feature**: デッキ別ユニークView数（deck-view-count）
+- **Completed Feature**: Issue #21 Textract OCR + 訂正UI / Issue #22 Google Slides URL 取り込み
 - **Completed Feature**: デッキ個別OGP＋ビューア改善（既定オリジナル・タブ順変更・全画面表示）
 - **Completed Feature**: 公開URLの user 部分を Clerk username 化 / 公開識別子の Google Meet 形式ランダムID化
 
@@ -112,3 +113,24 @@
 - **unit-text-correction（#21 訂正UI）**: `app/[user]/[slug]/edit/page.tsx`（所有者限定・正規 slug のみ）+ `components/slide-text-editor.tsx`（ブロック単位/スライド単位 textarea + 保存）+ `app/actions/slide-text.ts`（`updateSlideText`：所有権検証→ブロック/スライドテキスト更新→`@aws-sdk/client-translate` で target_languages 再翻訳→DSQL 更新→revalidatePath）。`DeckViewer` に `isOwner` 時のみ「テキストを編集」ボタン、`Deck` 型に `ownerId` 追加。
 - **検証**: vitest 26件 PASS（gslides パース18件追加）/ frontend `pnpm build` 成功 / src `npm run build`（tsc）成功 / handler.py `py_compile` OK。
 - **デプロイ前提（ユーザー作業）**: GCP で Drive API 有効化 + API キーを `GOOGLE_API_KEY` として env/Vercel へ設定、フロントエンド用 AWS 認証情報に `translate:TranslateText` 付与、`cd src && npm run deploy`。
+
+## Construction Stage Progress — deck-view-count ユニット
+| Phase | Stage | Status |
+|-------|-------|--------|
+| CONSTRUCTION | Functional Design | [-] Skip（要件定義で確定済） |
+| CONSTRUCTION | NFR Requirements | [-] Skip |
+| CONSTRUCTION | NFR Design | [-] Skip |
+| CONSTRUCTION | Infrastructure Design | [-] Skip |
+| CONSTRUCTION | Code Generation | [x] Completed |
+| CONSTRUCTION | Build and Test | [x] Completed |
+
+### 実装サマリ（deck-view-count）
+- デッキ別ユニークView数を実装。`decks.views`（既存・未インクリメントだった列）を非正規化カウンタとして活用し、新規 `deck_views` テーブルの複合主キー `(deck_id, viewer_id)` でユニーク判定。
+- スキーマ: `src/schema/schema.sql` に `deck_views(deck_id, viewer_id, viewed_at)` ＋ `idx_deck_views_deck_id` 追加（`deck_likes` と同型・`pnpm db:schema` で冪等適用）。
+- 計測: `frontend/app/api/decks/[deckId]/view/route.ts`（POST）新設。viewer_id = Clerk user_id or `anon:<uuid>`（`lib/viewer-id.ts` で検証・正規化）。所有者・非公開・既視聴（23505）はカウントせず。INSERT→views++ をトランザクションで実行（`likeDeck` と同パターン）。
+- 送信: `frontend/components/view-tracker.tsx`（client）をデッキページにマウント。localStorage `hiravi_vid`（匿名UUID）＋ `hiravi_viewed:<deckId>` 送信済みガードで `useEffect` 1回のみ POST（keepalive）。prefetch・OGP クローラー・JS非実行 Bot は計測されない。スライド未生成デッキでは発火しない。
+- 表示: ダッシュボードの各デッキ行に Eye アイコン＋ `formatCount(views)` を追加（SELECT に `views` 追加）。
+- 新規: `frontend/lib/viewer-id.test.ts`（3件）。
+- 検証: vitest 29件 PASS / frontend `pnpm build`（型チェック含む）成功、`/api/decks/[deckId]/view` ルート登録確認。
+- **デプロイ前提（ユーザー作業）**: `cd src && pnpm db:schema` で `deck_views` 作成（適用前は計測 API が 500 を返すが閲覧は阻害しない）。
+- 要件: `aidlc-docs/inception/requirements/deck-view-count-requirements.md`

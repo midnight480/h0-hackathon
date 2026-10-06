@@ -69,12 +69,23 @@ CREATE TABLE IF NOT EXISTS deck_likes (
     PRIMARY KEY (deck_id, liker_id)
 );
 
+-- viewer_id: Clerk user_id (authenticated) or "anon:<uuid>" (anonymous, localStorage-backed)
+-- 複合主キーにより同一視聴者の再閲覧は一意制約で重複排除（ユニークカウント）。
+-- decks.views は新規ユニーク視聴のたびに +1 する非正規化カウンタ。
+CREATE TABLE IF NOT EXISTS deck_views (
+    deck_id   UUID        NOT NULL,
+    viewer_id TEXT        NOT NULL,
+    viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (deck_id, viewer_id)
+);
+
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_user_id   ON decks (user_id);
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_status    ON decks (status);
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_category  ON decks (category);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slides_deck_id  ON slides (deck_id, page_number);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slide_texts_slide_id ON slide_texts (slide_id, language_code);
 CREATE INDEX ASYNC IF NOT EXISTS idx_deck_likes_deck_id ON deck_likes (deck_id);
+CREATE INDEX ASYNC IF NOT EXISTS idx_deck_views_deck_id ON deck_views (deck_id);
 -- 旧URLリダイレクト（legacy_slug 一致）検索用インデックス。
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_legacy_slug ON decks (legacy_slug);
 -- username による公開URL解決（Clerk API を呼ばず DSQL で直接検索）用インデックス。

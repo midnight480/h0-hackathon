@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Eye,
   Heart,
   Layers,
   Loader2,
@@ -30,6 +31,7 @@ interface DeckRow {
   original_language: string
   target_languages: string[]
   slide_count: number
+  views: number
   likes: number
   status: ProcessingStatus
   cover_image_key: string | null
@@ -116,6 +118,10 @@ function DashRow({ deck, userId, t }: { deck: DeckRow; userId: string; t: TFunc 
             {t('dashboard.slidesCount', { count: deck.slide_count })}
           </span>
           <span className="flex items-center gap-1">
+            <Eye className="size-3.5" />
+            {formatCount(deck.views)}
+          </span>
+          <span className="flex items-center gap-1">
             <Heart className="size-3.5" />
             {formatCount(deck.likes)}
           </span>
@@ -162,7 +168,7 @@ export default async function DashboardPage() {
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<DeckRow>(
       `SELECT id, slug, username, title, original_language, target_languages,
-              slide_count, likes, status, cover_image_key, published_at, is_public
+              slide_count, views, likes, status, cover_image_key, published_at, is_public
        FROM decks
        WHERE user_id = $1 AND deleted_at IS NULL
        ORDER BY published_at DESC`,
