@@ -43,4 +43,4 @@ sync-env:
 
 frontend-deploy:
 	$(MAKE) sync-env ENV=production ENV_FILE=.env
-	cd frontend && vercel --prod
+	vercel --prod --yes

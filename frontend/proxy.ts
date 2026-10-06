@@ -13,6 +13,7 @@ const isPublicRoute = createRouteMatcher([
   "/monitoring(.*)", // Sentry トンネルルート
   "/opengraph-image(.*)", // OGP 画像（SNS クローラがアクセス）
   "/twitter-image(.*)",
+  "/api/decks/(.*)/view", // ユニークView計測（匿名も送信するため公開。権限制御はルート側で実施）
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

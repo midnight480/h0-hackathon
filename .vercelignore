@@ -1,0 +1,26 @@
+# Vercel プロジェクトは rootDirectory=frontend のため、frontend/ 以外の
+# ファイルはアップロード不要（CLI の 15,000 files 上限対策）。
+src/
+aidlc-docs/
+diagrams/
+build-pdf/
+docs/
+.kiro/
+.claude/
+.agents/
+.git/
+article.md
+article_en.md
+response.json
+PROMPT.md
+CLERK_PROMPT.md
+GEMINI.md
+CLAUDE.md
+AGENTS.md
+README.md
+README_ja.md
+skills-lock.json
+Makefile
+hiravi-architecture.drawio
+**/.next/
+**/node_modules/
