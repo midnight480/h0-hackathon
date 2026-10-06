@@ -59,6 +59,17 @@ export class HiraviVercelAccessStack extends cdk.Stack {
       })
     );
 
+    // Amazon Translate: テキスト訂正後の再翻訳
+    // TranslateText はリソースレベル権限をサポートしないため "*" を使用
+    vercelUser.addToPolicy(
+      new iam.PolicyStatement({
+        sid: "TranslateText",
+        effect: iam.Effect.ALLOW,
+        actions: ["translate:TranslateText"],
+        resources: ["*"],
+      })
+    );
+
     // アクセスキー生成
     const accessKey = new iam.AccessKey(this, "HiraviVercelAccessKey", {
       user: vercelUser,
