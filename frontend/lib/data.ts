@@ -148,6 +148,9 @@ export interface Deck {
   publishedAt: string
   cover: string
   slides: Slide[]
+  // デッキ所有者の Clerk user_id。編集導線など所有者限定 UI の判定に使用。
+  // 一覧系クエリでは未取得のため省略可。
+  ownerId?: string
 }
 
 export const CATEGORIES: { value: Category | 'all'; label: string }[] = [

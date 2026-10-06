@@ -22,6 +22,10 @@ DSQL_ENDPOINT = os.environ.get("DSQL_ENDPOINT", "")
 DSQL_REGION = os.environ.get("DSQL_REGION", "ap-northeast-1")
 VERCEL_REVALIDATE_URL = os.environ.get("VERCEL_REVALIDATE_URL", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+# OCR (Amazon Textract) フォールバック。テキストレイヤーを持たない画像のみ PDF 用。
+OCR_ENABLED = os.environ.get("OCR_ENABLED", "true").lower() not in ("false", "0", "no")
+# 暴走防止のため OCR を実行するページ数の上限
+OCR_MAX_PAGES = int(os.environ.get("OCR_MAX_PAGES", "100"))
 
 
 def main(event, context):
@@ -44,12 +48,15 @@ def main(event, context):
             # 3. テキスト抽出
             texts = extract_text_from_pdf(pdf_path)
 
-            # 4. 翻訳
-            translations = translate_texts(texts, target_languages)
-
-            # 4b. オーバーレイ表示（B案）用のブロック生成＋ブロック単位翻訳
+            # 3b. オーバーレイ表示（B案）用のブロック生成
             #     元画像の上に訳文を元の位置で重ねるためのレイアウト情報。
             layout = extract_overlay_blocks(pdf_path)
+
+            # 3c. テキストレイヤーが空のページは Textract OCR にフォールバック
+            texts, layout = apply_ocr_fallback(pdf_path, texts, layout)
+
+            # 4. 翻訳
+            translations = translate_texts(texts, target_languages)
             layout = translate_overlay_blocks(layout, target_languages)
 
             # 5. DB 更新 (processing_status = 'ready')
@@ -357,6 +364,124 @@ def extract_overlay_blocks(pdf_path: str) -> list[list[dict]]:
 
     doc.close()
     return pages_blocks
+
+
+def apply_ocr_fallback(
+    pdf_path: str, texts: list[str], layout: list[list[dict]]
+) -> tuple[list[str], list[list[dict]]]:
+    """テキストレイヤーが空のページに対し Amazon Textract で OCR フォールバック。
+
+    extract_text_from_pdf / extract_overlay_blocks のどちらでも内容が
+    取れなかったページのみを対象とし、同期 DetectDocumentText をページ画像
+    （PNG。Textract は WebP 非対応・同期 API は 5MB 上限）に対して実行する。
+    LINE ブロックを既存オーバーレイスキーマ（x0..y1 正規化 bbox / fs / bg /
+    t.original）にマップし、テキストパネル用には読み順で連結した文字列を返す。
+
+    ページ単位の失敗は警告ログのみで空のまま継続し、デッキ全体は failed にしない。
+    """
+    import re
+
+    import boto3
+    import fitz  # PyMuPDF
+    import PIL.Image
+
+    if not OCR_ENABLED:
+        return texts, layout
+
+    n_pages = max(len(texts), len(layout))
+    empty_indices = [
+        i
+        for i in range(n_pages)
+        if not (texts[i] if i < len(texts) else "").strip()
+        and not (layout[i] if i < len(layout) else [])
+    ]
+    if not empty_indices:
+        return texts, layout
+
+    if len(empty_indices) > OCR_MAX_PAGES:
+        logger.warning(
+            f"OCR requested for {len(empty_indices)} pages exceeds "
+            f"OCR_MAX_PAGES={OCR_MAX_PAGES}; truncating"
+        )
+        empty_indices = empty_indices[:OCR_MAX_PAGES]
+
+    logger.info(f"Running Textract OCR on {len(empty_indices)} page(s)")
+    textract = boto3.client("textract")
+    PAGE_NUMBER_RE = re.compile(r"^\s*\d+\s*$")
+
+    # 戻り値の長さをページ数に揃える（呼び出し側の i-1 インデックス前提のため）
+    while len(texts) < n_pages:
+        texts.append("")
+    while len(layout) < n_pages:
+        layout.append([])
+
+    doc = fitz.open(pdf_path)
+    for i in empty_indices:
+        try:
+            page = doc[i]
+
+            # Textract 同期 API の上限 5MB を下回るまでレンダリング倍率を下げる
+            png_bytes = None
+            pix = None
+            for scale in (2.0, 1.5, 1.0, 0.5):
+                pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
+                png_bytes = pix.tobytes("png")
+                if len(png_bytes) <= 5 * 1024 * 1024:
+                    break
+            if len(png_bytes) > 5 * 1024 * 1024:
+                logger.warning(f"Page {i + 1}: rendered image exceeds 5MB, skipping OCR")
+                continue
+
+            resp = textract.detect_document_text(Document={"Bytes": png_bytes})
+            lines = [
+                b
+                for b in resp.get("Blocks", [])
+                if b.get("BlockType") == "LINE" and b.get("Text", "").strip()
+            ]
+            # 読み順（上→下、左→右）にソート
+            lines.sort(
+                key=lambda b: (
+                    b["Geometry"]["BoundingBox"]["Top"],
+                    b["Geometry"]["BoundingBox"]["Left"],
+                )
+            )
+
+            img = PIL.Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+            blocks: list[dict] = []
+            line_texts: list[str] = []
+            for b in lines:
+                text = b["Text"].strip()
+                if PAGE_NUMBER_RE.match(text):
+                    continue
+                bb = b["Geometry"]["BoundingBox"]
+                x0, y0 = bb["Left"], bb["Top"]
+                x1, y1 = x0 + bb["Width"], y0 + bb["Height"]
+                # BoundingBox はページに対する 0..1 正規化。bg サンプリング用に
+                # レンダリング画像のピクセル座標へ変換する
+                bg = _sample_bg_color(
+                    img, x0 * pix.width, y0 * pix.height,
+                    x1 * pix.width, y1 * pix.height,
+                )
+                blocks.append({
+                    "x0": round(x0, 5),
+                    "y0": round(y0, 5),
+                    "x1": round(x1, 5),
+                    "y1": round(y1, 5),
+                    "fs": round(bb["Height"], 5),
+                    "bg": bg,
+                    "t": {"original": text},
+                })
+                line_texts.append(text)
+
+            layout[i] = blocks
+            texts[i] = "\n".join(line_texts).strip()
+            img.close()
+        except Exception as e:
+            logger.warning(f"Textract OCR failed on page {i + 1}: {e}")
+
+    doc.close()
+    return texts, layout
 
 
 def translate_overlay_blocks(

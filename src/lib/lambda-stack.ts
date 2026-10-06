@@ -67,6 +67,9 @@ export class HiraviLambdaStack extends cdk.Stack {
           // Vercel revalidation webhook
           VERCEL_REVALIDATE_URL: "",
           WEBHOOK_SECRET: "",
+          // Textract OCR フォールバック（テキストレイヤー無しページのみ実行）
+          OCR_ENABLED: "true",
+          OCR_MAX_PAGES: "100",
         },
         // X-Ray トレーシング
         tracing: lambda.Tracing.ACTIVE,

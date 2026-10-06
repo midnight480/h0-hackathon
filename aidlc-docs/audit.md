@@ -174,3 +174,42 @@
 **Context**: Operations - 依存更新。残存脆弱性2件（frontend braces/src brace-expansion）は上流未修正のため許容残存として記録。ブランチ chore/package-updates（feature/deck-ogp-viewer からのスタック）。
 
 ---
+
+## Inception - Workspace Detection（新規フィーチャー: OCR + URL取り込み）
+**Timestamp**: 2026-10-05T02:00:00Z
+**User Input**: "#23 は調査結果をコメントしてCloseしましょう。 #21, #22 は実装してください。"
+**AI Response**: GitHub Issue #23（SpeakerDeck 取り込み）は ToS §3.4 のスクレイピング禁止条項に抵触するため調査結果コメントを付してクローズ済み。#21（Amazon Textract OCR フォールバック）と #22（Google Slides 共有URL取り込み）の実装を開始。既存 aidlc-state.md・RE 成果物ありのブラウンフィールドのため Reverse Engineering はスキップし Requirements Analysis へ。
+**Context**: Request Type: Enhancement ×2 / Scope: src/lambda + frontend + CDK / Complexity: Moderate。
+
+---
+
+## Requirements Analysis - 質問回答・要件定義生成（ocr-url-import）
+**Timestamp**: 2026-10-05T02:15:00Z
+**User Input**: "（質問回答）Q1=A) Drive API files.export、Q2=B) 訂正UIも今回実装、Q3=A) 同期 DetectDocumentText、Q4/Q5=拡張ルール適用しない"
+**AI Response**: 回答を ocr-url-import-questions.md に記録。要件定義 `aidlc-docs/inception/requirements/ocr-url-import-requirements.md` を生成。#22 は Drive API 正式経路＋同意チェック、#21 は同期 Textract フォールバック＋所有者限定のブロック/スライド単位訂正UI＋再翻訳。Security Baseline / PBT は opt-out として aidlc-state.md に記録。
+**Context**: Inception - Requirements Analysis 完了・承認待ち。
+
+---
+
+## Requirements Analysis - 承認 / Workflow Planning - 実行計画作成（ocr-url-import）
+**Timestamp**: 2026-10-05T02:40:00Z
+**User Input**: "続けて"
+**AI Response**: 要件定義を承認済みとみなし Workflow Planning へ進行。質問ファイルの回答欄が一部壊れていたため再確認し Q1=A・Q3=A で確定。実行計画 `aidlc-docs/inception/plans/ocr-url-import-execution-plan.md` を作成。3ユニット（unit-ocr / unit-gslides-import / unit-text-correction）を順次実行、Functional Design は OCR・訂正ユニットのみ軽量実施、User Stories/Application Design/Units Generation/NFR/Infrastructure Design はスキップ。
+**Context**: Workflow Planning 完了・承認待ち。Risk: Medium。
+
+---
+
+## Workflow Planning - 承認
+**Timestamp**: 2026-10-05T03:00:00Z
+**AI Prompt**: "実行計画の承認確認"
+**User Response**: "つづけて"
+**Status**: Approved
+**Context**: 3ユニット順次実行の計画で Construction へ進行。
+
+---
+
+## Inception - Workspace Detection（新規フィーチャー: デッキ別View数）
+**Timestamp**: 2026-10-05T05:00:00Z
+**User Input**: "アップロードしているデッキごとに、アクセスView数を出すことはできますか？" → 調査回答後の設計確認に対し「所有者自身の閲覧を除外」「ユニークカウント」「Bot除外（クライアントbeacon方式）」の3点を明示的に採用。
+**AI Response**: 現状調査の結果、`decks.views` カラムは存在し SELECT・`ORDER BY views DESC` で利用済みだが、インクリメント処理と画面表示が未実装であることを確認。当初設計（PROMPT.md）では INSERT-only の `deck_views` イベントテーブル構想あり。既存 aidlc-state.md・RE 成果物ありのブラウンフィールドのため Reverse Engineering はスキップし Requirements Analysis へ。
+**Context**: Request Type: Enhancement / Scope: frontend（Route Handler・表示）+ schema / Complexity: Low〜Medium。進行中の OCR フィーチャー（feat/ocr-gslides-import ブランチ・未コミット変更あり）とは別フィーチャーとして扱う。

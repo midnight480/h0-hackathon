@@ -9,6 +9,7 @@ import {
   Languages,
   Maximize2,
   Minimize2,
+  Pencil,
   Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -141,10 +142,13 @@ export function DeckViewer({
   deck,
   related,
   initialLiked = false,
+  isOwner = false,
 }: {
   deck: Deck
   related: Deck[]
   initialLiked?: boolean
+  // デッキ所有者向けの編集導線（テキスト訂正ページ）を表示するか
+  isOwner?: boolean
 }) {
   const t = useT()
   const available: LanguageCode[] = [...new Set([deck.originalLanguage, ...deck.targetLanguages])]
@@ -166,22 +170,55 @@ export function DeckViewer({
   // 画像の自然高さが確定して初めて cqh が正しく解決されるため、ロード後に 1 回再計算する。
   const [imgRev, setImgRev] = useState(0)
 
-  // 全画面表示（Fullscreen API）。スライド表示エリアを全画面化し、
-  // Esc・ブラウザUI等での解除も fullscreenchange で拾って状態を同期する。
+  // 全画面表示。Fullscreen API 対応環境ではネイティブ全画面を使い、
+  // 非対応環境（iPhone Safari など <video> 以外に requestFullscreen が
+  // 無いブラウザ）では fixed 配置の疑似全画面へフォールバックする。
+  // Esc・ブラウザUI等での解除は fullscreenchange で拾って状態を同期する。
   const slideAreaRef = useRef<HTMLDivElement>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fsMode, setFsMode] = useState<'native' | 'pseudo' | null>(null)
+  const isFullscreen = fsMode !== null
 
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    const onFsChange = () => {
+      if (!document.fullscreenElement) {
+        setFsMode((m) => (m === 'native' ? null : m))
+      }
+    }
     document.addEventListener('fullscreenchange', onFsChange)
     return () => document.removeEventListener('fullscreenchange', onFsChange)
   }, [])
 
+  // 疑似全画面中は背面ページがスクロールしないよう固定する
+  useEffect(() => {
+    if (fsMode !== 'pseudo') return
+    const { body, documentElement } = document
+    const prevBodyOverflow = body.style.overflow
+    const prevHtmlOverflow = documentElement.style.overflow
+    body.style.overflow = 'hidden'
+    documentElement.style.overflow = 'hidden'
+    return () => {
+      body.style.overflow = prevBodyOverflow
+      documentElement.style.overflow = prevHtmlOverflow
+    }
+  }, [fsMode])
+
   const toggleFullscreen = () => {
+    if (fsMode === 'pseudo') {
+      setFsMode(null)
+      return
+    }
     if (document.fullscreenElement) {
       void document.exitFullscreen()
+      return
+    }
+    const el = slideAreaRef.current
+    if (!el) return
+    if (typeof el.requestFullscreen === 'function' && document.fullscreenEnabled) {
+      Promise.resolve(el.requestFullscreen())
+        .then(() => setFsMode(document.fullscreenElement ? 'native' : 'pseudo'))
+        .catch(() => setFsMode('pseudo'))
     } else {
-      void slideAreaRef.current?.requestFullscreen()
+      setFsMode('pseudo')
     }
   }
 
@@ -195,6 +232,8 @@ export function DeckViewer({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') go(1)
       if (e.key === 'ArrowLeft') go(-1)
+      // 疑似全画面はブラウザの Esc 解除が効かないため自前で閉じる
+      if (e.key === 'Escape') setFsMode((m) => (m === 'pseudo' ? null : m))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -235,8 +274,15 @@ export function DeckViewer({
         {/* Viewer column */}
         <div>
           <div className="overflow-hidden rounded-xl border border-border bg-card">
-            {/* 全画面化の対象。全画面時はこの要素が top layer で画面全体に広がる。 */}
-            <div ref={slideAreaRef} className="relative">
+            {/* 全画面化の対象。ネイティブ全画面時は top layer で画面全体に広がる。
+                疑似全画面時は fixed でビューポート全体を覆う（ヘッダー z-50 より上）。 */}
+            <div
+              ref={slideAreaRef}
+              className={cn(
+                'relative',
+                fsMode === 'pseudo' && 'fixed inset-0 z-[60] bg-black',
+              )}
+            >
             {(() => {
               const navButtons = (
                 <>
@@ -484,6 +530,14 @@ export function DeckViewer({
               <Share2 className="size-4" />
               {t('viewer.share')}
             </Button>
+            {isOwner && (
+              <Button variant="outline" className="flex-1 gap-2" asChild>
+                <Link href={`/@${deck.author.username}/${deck.slug}/edit`}>
+                  <Pencil className="size-4" />
+                  {t('viewer.editText')}
+                </Link>
+              </Button>
+            )}
           </div>
 
           {/* Author */}
