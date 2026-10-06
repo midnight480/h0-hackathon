@@ -230,3 +230,9 @@
 **User Input**: AWS SSO 一時認証情報を提供し `pnpm db:schema` 実行を許可
 **AI Response**: `frontend/.env.local` の `DSQL_ENDPOINT`（us-east-1）を使用し `cd src && pnpm db:schema` を実行。`deck_views` テーブルと `idx_deck_views_deck_id`（ASYNC）を含む全ステートメントが正常適用。View 計測の DB 側前提が完了。
 **Context**: deck-view-count のデプロイ前提タスク解消。残りはフロントエンドのデプロイのみ。
+
+## Operations - 本番デプロイ（deck-view-count + ocr-url-import）
+**Timestamp**: 2026-10-06T12:00:00Z
+**User Input**: "アプリデプロイしましょうか" → フロント+CDK両方・コミットしてからデプロイ・GOOGLE_API_KEYはGCPプロジェクト h0hackathon を使用許可
+**AI Response**: コミット分離（chore: README/gitignore、feat: view計測、feat: Vercel IAM TranslateText、fix: proxy公開ルート+.vercelignore）→ push。`cdk deploy --all` で全6スタック更新（OrbStack起動後にLambda bundling成功）。GCP ADCトークンで Drive API + apikeys API を有効化し Drive 限定 APIキー `hiravi-gslides-import` を発行 → frontend/.env(.local) に GOOGLE_API_KEY 追加 → `vercel env add` で Production 登録 → `vercel --prod` 成功（hiravi.midnight480.com）。初回デプロイで /api/decks/*/view が proxy.ts の auth.protect() に遮断される問題を発見し公開ルート追加で再デプロイ。E2E確認: 実デッキへの POST で counted:true（deck_views INSERT + views+1）→ 同一 viewer で counted:false（複合主キー重複排除）→ 不正ID/不存在デッキは 400/404 JSON。テストデータは SQL で削除・views 復元済み。
+**Context**: View計測・OCR・Google Slides取り込み・テキスト訂正がすべて本番稼働。Makefile frontend-deploy は rootDirectory=frontend 設定に合わせリポジトリルート実行に修正済み。

@@ -41,3 +41,4 @@ response.json
 src/layers/ghostscript/*.zip
 src/lambda/processing/__pycache__/
 src/lambda/processing/*.pyc
+.vercel
