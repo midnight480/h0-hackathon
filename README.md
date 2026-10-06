@@ -28,7 +28,7 @@ flowchart TD
         VIEW["Deck pages (ISR)<br/>/@[user]/[slug]<br/>+ profile /@[user]"]
     end
 
-    subgraph aws["AWS — ap-northeast-1 (Tokyo)"]
+    subgraph aws["AWS — us-east-1 (N. Virginia)"]
         S3["S3<br/>uploads/ + slides/public/"]
         SQS["SQS<br/>processing queue + DLQ"]
         LAMBDA["Lambda (Python 3.12)<br/>hiravi-slide-processor<br/>+ Ghostscript layer"]

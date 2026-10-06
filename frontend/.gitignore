@@ -8,3 +8,4 @@ tsconfig.tsbuildinfo
 # Sentry
 .env.sentry-build-plugin
 .sentryclirc
+.vercel
