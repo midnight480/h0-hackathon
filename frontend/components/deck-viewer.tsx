@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Heart,
@@ -221,6 +222,9 @@ export function DeckViewer({
       setFsMode('pseudo')
     }
   }
+
+  // サムネイル一覧はページ下部を長く占めるため、初期表示では折りたたむ
+  const [showThumbs, setShowThumbs] = useState(false)
 
   const slide = deck.slides[index]
   const total = deck.slides.length
@@ -476,24 +480,38 @@ export function DeckViewer({
 
           {/* Thumbnails */}
           <div className="mt-6">
-            <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => setShowThumbs((v) => !v)}
+              aria-expanded={showThumbs}
+              aria-controls="all-slides-grid"
+              className="mb-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              <ChevronDown
+                className={cn('size-4 transition-transform', showThumbs && 'rotate-180')}
+              />
               {t('viewer.allSlides')}
-            </h2>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-              {deck.slides.map((s, i) => (
-                <button
-                  key={s.pageNumber}
-                  onClick={() => setIndex(i)}
-                  aria-label={`${t('viewer.allSlides')} ${i + 1}`}
-                  className={cn(
-                    'relative aspect-[16/10] overflow-hidden rounded-md border-2 bg-muted transition',
-                    i === index ? 'border-accent' : 'border-transparent hover:border-border',
-                  )}
-                >
-                  <img src={s.imageUrl || '/placeholder.svg'} alt="" className="size-full object-cover" />
-                </button>
-              ))}
-            </div>
+              <span className="text-xs text-muted-foreground/70">
+                {t('viewer.slidesCount', { count: total })}
+              </span>
+            </button>
+            {showThumbs && (
+              <div id="all-slides-grid" className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                {deck.slides.map((s, i) => (
+                  <button
+                    key={s.pageNumber}
+                    onClick={() => setIndex(i)}
+                    aria-label={`${t('viewer.allSlides')} ${i + 1}`}
+                    className={cn(
+                      'relative aspect-[16/10] overflow-hidden rounded-md border-2 bg-muted transition',
+                      i === index ? 'border-accent' : 'border-transparent hover:border-border',
+                    )}
+                  >
+                    <img src={s.imageUrl || '/placeholder.svg'} alt="" className="size-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
