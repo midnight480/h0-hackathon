@@ -243,6 +243,49 @@ export function DeckViewer({
     return () => window.removeEventListener('keydown', onKey)
   }, [total])
 
+  // スライド画像の先読み。Overlay表示中のスライド移動では、ブラウザが新画像を
+  // デコードするまで旧画像(原文のまま)を表示し続ける一方、オーバーレイ層は即座に
+  // 次スライドのブロックへ更新されるため、一瞬「旧スライド+ずれた訳文」が見える。
+  // 事前に画像をキャッシュへ載せてこの残像時間を潰す。
+  // Imageオブジェクトはデコード済みキャッシュをGCで落とされないようrefで保持する。
+  const preloadedRef = useRef<Set<string>>(new Set())
+  const preloadedImgsRef = useRef<HTMLImageElement[]>([])
+
+  // 移動のたびに進行方向を優先して先読み（次3枚・前1枚）
+  useEffect(() => {
+    for (const d of [1, 2, 3, -1]) {
+      const url = deck.slides[index + d]?.imageUrl
+      if (!url || preloadedRef.current.has(url)) continue
+      preloadedRef.current.add(url)
+      const img = new Image()
+      img.src = url
+      preloadedImgsRef.current.push(img)
+    }
+  }, [index, deck.slides])
+
+  // 残りのスライドも、表示中画像と帯域を争わないよう遅延・逐次で先読みする
+  useEffect(() => {
+    let cancelled = false
+    const step = (i: number) => {
+      if (cancelled || i >= deck.slides.length) return
+      const url = deck.slides[i]?.imageUrl
+      if (url && !preloadedRef.current.has(url)) {
+        preloadedRef.current.add(url)
+        const img = new Image()
+        img.onload = img.onerror = () => step(i + 1)
+        img.src = url
+        preloadedImgsRef.current.push(img)
+      } else {
+        step(i + 1)
+      }
+    }
+    const timer = setTimeout(() => step(0), 1500)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [deck.slides])
+
   const slideText = slide?.text?.[lang] ?? slide?.text?.[deck.originalLanguage] ?? slide?.text?.en
 
   const share = async () => {
