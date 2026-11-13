@@ -1,7 +1,7 @@
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import { clerkClient } from '@clerk/nextjs/server'
-import { Heart, Layers } from 'lucide-react'
+import { Eye, Heart, Layers } from 'lucide-react'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -146,6 +146,10 @@ export default async function UserPage({
                         <span className="flex items-center gap-1">
                           <Layers className="size-3.5" />
                           {deck.slide_count} slides
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye className="size-3.5" />
+                          {formatCount(deck.views)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Heart className="size-3.5" />

@@ -213,3 +213,21 @@
 **User Input**: "アップロードしているデッキごとに、アクセスView数を出すことはできますか？" → 調査回答後の設計確認に対し「所有者自身の閲覧を除外」「ユニークカウント」「Bot除外（クライアントbeacon方式）」の3点を明示的に採用。
 **AI Response**: 現状調査の結果、`decks.views` カラムは存在し SELECT・`ORDER BY views DESC` で利用済みだが、インクリメント処理と画面表示が未実装であることを確認。当初設計（PROMPT.md）では INSERT-only の `deck_views` イベントテーブル構想あり。既存 aidlc-state.md・RE 成果物ありのブラウンフィールドのため Reverse Engineering はスキップし Requirements Analysis へ。
 **Context**: Request Type: Enhancement / Scope: frontend（Route Handler・表示）+ schema / Complexity: Low〜Medium。進行中の OCR フィーチャー（feat/ocr-gslides-import ブランチ・未コミット変更あり）とは別フィーチャーとして扱う。
+
+---
+
+## Requirements Analysis / Construction（deck-view-analytics）
+**Timestamp**: 2026-11-13T03:00:00Z
+**User Input**: "各スライドのアクセス数をカウントしてView 数を表示できるようにしてください。"
+**AI Response**: 前回セッション（2026-10-05T05:00:00Z）で確定した設計（所有者の閲覧を除外・ユニークカウント・クライアント beacon による Bot 除外）で実装を開始。`deck_views` テーブル、`recordDeckView` Server Action、各一覧とビューアへの Eye アイコン表示を追加。
+**Context**: ブランチ feat/deck-view-count。
+
+---
+
+## Requirements Analysis - 追加要件（deck-view-analytics）
+**Timestamp**: 2026-11-13T03:10:00Z
+**User Input**: "あと認証済みのユーザーで、そのダッシュボード入って、自分のデックを編集、編集というか、その触れる画面になった時に、そのデックの、なんて言うんですかね、詳細な分析、日別にアクセス数がどういう風に移動したのか。一覧画面上はビュー数は総トータルでいいんですけど、そのスライドが日別にどういう風にアクセスされたのかとか流入元がもし取れるんだったら取ってほしいですね。例えば、Xから来たのかとか、Facebookから来たのかとか、ダイレクトで来たのかとか、どういう経路からアクセスがされたのかっていうのが取れると、その資料が例えば他のSNS、ソーシャルメディアに展開されて、閲覧されたのかとか、自分が発信したことがそれで見られたのかとか、アクセスが分析できると嬉しいなと思いました。"
+**AI Response**: INSERT-only の `deck_view_events`（流入元・参照元ホスト）を追加し、所有者限定の分析ページ `/dashboard/decks/[id]`（7/30/90日、日別の PV とユニーク閲覧者、流入元の内訳、参照元サイト）を実装。要件は `aidlc-docs/inception/requirements/deck-view-analytics-requirements.md` に記載。一覧はユニークの累計 View 数を表示。検証: vitest 42件 PASS、`pnpm build`（型チェック含む）成功。DSQL へのスキーマ反映（`cd src && pnpm db:schema`）は人間側で実施する。
+**Context**: Requirements Analysis（Standard）→ Code Generation → Build and Test。User Stories / Application Design / Units / NFR / Infrastructure はスキップ（単一ユニット・frontend 中心）。
+
+---

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Eye,
   Heart,
   Layers,
   Loader2,
@@ -14,6 +15,7 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { DeckAnalyticsButton } from '@/components/deck-analytics-button'
 import { DeckDeleteButton } from '@/components/deck-delete-button'
 import { DeckVisibilityToggle } from '@/components/deck-visibility-toggle'
 import { withDb } from '@/lib/db'
@@ -30,6 +32,7 @@ interface DeckRow {
   original_language: string
   target_languages: string[]
   slide_count: number
+  views: number
   likes: number
   status: ProcessingStatus
   cover_image_key: string | null
@@ -116,6 +119,10 @@ function DashRow({ deck, userId, t }: { deck: DeckRow; userId: string; t: TFunc 
             {t('dashboard.slidesCount', { count: deck.slide_count })}
           </span>
           <span className="flex items-center gap-1">
+            <Eye className="size-3.5" />
+            {formatCount(deck.views)}
+          </span>
+          <span className="flex items-center gap-1">
             <Heart className="size-3.5" />
             {formatCount(deck.likes)}
           </span>
@@ -132,6 +139,9 @@ function DashRow({ deck, userId, t }: { deck: DeckRow; userId: string; t: TFunc 
           <Button variant="outline" size="sm" className="hidden sm:inline-flex">
             {t('dashboard.retry')}
           </Button>
+        )}
+        {deck.status === 'ready' && (
+          <DeckAnalyticsButton deckId={deck.id} label={t('dashboard.analytics')} />
         )}
         {deck.status === 'ready' && (
           <DeckVisibilityToggle
@@ -162,7 +172,7 @@ export default async function DashboardPage() {
   const decks = await withDb(async (client) => {
     const { rows } = await client.query<DeckRow>(
       `SELECT id, slug, username, title, original_language, target_languages,
-              slide_count, likes, status, cover_image_key, published_at, is_public
+              slide_count, views, likes, status, cover_image_key, published_at, is_public
        FROM decks
        WHERE user_id = $1 AND deleted_at IS NULL
        ORDER BY published_at DESC`,
@@ -177,10 +187,12 @@ export default async function DashboardPage() {
   })
 
   const published = decks.filter((d) => d.status === 'ready')
+  const totalViews = published.reduce((s, d) => s + d.views, 0)
   const totalLikes = published.reduce((s, d) => s + d.likes, 0)
 
   const stats = [
     { label: t('dashboard.statDecks'), value: `${decks.length}` },
+    { label: t('dashboard.statViews'), value: formatCount(totalViews) },
     { label: t('dashboard.statLikes'), value: formatCount(totalLikes) },
     { label: t('dashboard.statLanguages'), value: `${new Set(decks.flatMap((d) => d.target_languages)).size}` },
   ]
@@ -202,7 +214,7 @@ export default async function DashboardPage() {
             </Button>
           </div>
 
-          <dl className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <dl className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
             {stats.map((s) => (
               <div key={s.label} className="rounded-xl border border-border bg-card p-4">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
