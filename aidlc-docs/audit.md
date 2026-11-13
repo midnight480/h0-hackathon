@@ -231,3 +231,11 @@
 **Context**: Requirements Analysis（Standard）→ Code Generation → Build and Test。User Stories / Application Design / Units / NFR / Infrastructure はスキップ（単一ユニット・frontend 中心）。
 
 ---
+
+## コミット・PR 作成（deck-view-analytics）
+**Timestamp**: 2026-11-13T03:30:00Z
+**User Input**: "はい"
+**AI Response**: ブランチ feat/deck-view-count にコミットして push し、PR #29 を作成した。
+**Context**: Build and Test 完了後の PR 作成。DSQL へのスキーマ反映は人間側の作業として残っている。
+
+---
