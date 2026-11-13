@@ -3,8 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-06-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（ocr-url-import）
-- **Active Feature**: Issue #21 Textract OCR + 訂正UI / Issue #22 Google Slides URL 取り込み
+- **Current Stage**: CONSTRUCTION - Code Generation / Build and Test 完了（deck-view-analytics・スキーマ反映待ち）
+- **Active Feature**: デッキ View 数とアクセス分析（deck-view-analytics）
+- **Completed Feature**: Issue #21 Textract OCR + 訂正UI / Issue #22 Google Slides URL 取り込み
 - **Completed Feature**: デッキ個別OGP＋ビューア改善（既定オリジナル・タブ順変更・全画面表示）
 - **Completed Feature**: 公開URLの user 部分を Clerk username 化 / 公開識別子の Google Meet 形式ランダムID化
 
@@ -112,3 +113,18 @@
 - **unit-text-correction（#21 訂正UI）**: `app/[user]/[slug]/edit/page.tsx`（所有者限定・正規 slug のみ）+ `components/slide-text-editor.tsx`（ブロック単位/スライド単位 textarea + 保存）+ `app/actions/slide-text.ts`（`updateSlideText`：所有権検証→ブロック/スライドテキスト更新→`@aws-sdk/client-translate` で target_languages 再翻訳→DSQL 更新→revalidatePath）。`DeckViewer` に `isOwner` 時のみ「テキストを編集」ボタン、`Deck` 型に `ownerId` 追加。
 - **検証**: vitest 26件 PASS（gslides パース18件追加）/ frontend `pnpm build` 成功 / src `npm run build`（tsc）成功 / handler.py `py_compile` OK。
 - **デプロイ前提（ユーザー作業）**: GCP で Drive API 有効化 + API キーを `GOOGLE_API_KEY` として env/Vercel へ設定、フロントエンド用 AWS 認証情報に `translate:TranslateText` 付与、`cd src && npm run deploy`。
+
+## Construction Stage Progress — deck-view-analytics ユニット
+| Phase | Stage | Status |
+|-------|-------|--------|
+| INCEPTION | Requirements Analysis | [x] Completed（`deck-view-analytics-requirements.md`） |
+| CONSTRUCTION | Functional Design | [-] Skip（要件定義で確定済） |
+| CONSTRUCTION | NFR Requirements / NFR Design / Infrastructure Design | [-] Skip |
+| CONSTRUCTION | Code Generation | [x] Completed |
+| CONSTRUCTION | Build and Test | [x] Completed（vitest 42件 PASS / next build 成功） |
+
+### 実装サマリ（deck-view-analytics）
+- スキーマ: `deck_views`（ユニーク判定）と `deck_view_events`（分析イベント）＋インデックス。反映は `cd src && pnpm db:schema`。
+- 計上: `app/actions/deck.ts` の `recordDeckView`（Bot UA・所有者・非公開を除外し、イベントを記録して初回のみ `decks.views` を加算）。`components/deck-viewer.tsx` のマウント時 beacon で referrer・utm_source・fbclid・クライアント遷移を送信。
+- 新規: `lib/bot.ts`、`lib/referrer.ts`（流入元の分類）、`lib/analytics.ts`（日別集計・JST）と各テスト、`components/deck-analytics-button.tsx`、`app/dashboard/decks/[id]/page.tsx`（分析ページ）。
+- 表示: deck-card / `[user]` / dashboard（行と総閲覧数）/ ビューアのサイドバーに View 数。i18n に `analytics.*` を追加。

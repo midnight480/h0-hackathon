@@ -69,13 +69,39 @@ CREATE TABLE IF NOT EXISTS deck_likes (
     PRIMARY KEY (deck_id, liker_id)
 );
 
+-- deck_views: デッキ閲覧のユニーク記録（viewer_id ごとに 1 回だけ decks.views を加算するための重複排除用）。
+-- viewer_id: Clerk user_id（認証済み）または "anon:<uuid>"（未認証・Cookie）。deck_likes と同じ識別子体系。
+-- 所有者自身の閲覧は記録しない（アプリ層で除外）。複合主キーで同一閲覧者の重複加算を防ぐ。
+CREATE TABLE IF NOT EXISTS deck_views (
+    deck_id    UUID        NOT NULL,
+    viewer_id  TEXT        NOT NULL,
+    viewed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (deck_id, viewer_id)
+);
+
+-- deck_view_events: 閲覧ごとの INSERT-only イベントログ（所有者向け分析: 日別推移・流入元）。
+-- deck_views（ユニーク判定）と異なり再訪も 1 行ずつ記録する。所有者・Bot・非公開デッキは記録しない。
+-- source: 流入元分類（x / facebook / linkedin / hatena / slack / line / search / other / direct / internal）。
+-- referrer_host: 参照元ホスト名のみ（フルURLは保持しない）。utm_source 指定時はその値。
+CREATE TABLE IF NOT EXISTS deck_view_events (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    deck_id       UUID        NOT NULL,
+    viewer_id     TEXT        NOT NULL,
+    source        TEXT        NOT NULL DEFAULT 'direct',
+    referrer_host TEXT,
+    viewed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_user_id   ON decks (user_id);
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_status    ON decks (status);
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_category  ON decks (category);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slides_deck_id  ON slides (deck_id, page_number);
 CREATE INDEX ASYNC IF NOT EXISTS idx_slide_texts_slide_id ON slide_texts (slide_id, language_code);
 CREATE INDEX ASYNC IF NOT EXISTS idx_deck_likes_deck_id ON deck_likes (deck_id);
+CREATE INDEX ASYNC IF NOT EXISTS idx_deck_views_deck_id ON deck_views (deck_id);
 -- 旧URLリダイレクト（legacy_slug 一致）検索用インデックス。
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_legacy_slug ON decks (legacy_slug);
 -- username による公開URL解決（Clerk API を呼ばず DSQL で直接検索）用インデックス。
 CREATE INDEX ASYNC IF NOT EXISTS idx_decks_username ON decks (username);
+-- 分析ページの期間指定取得用インデックス。
+CREATE INDEX ASYNC IF NOT EXISTS idx_deck_view_events_deck ON deck_view_events (deck_id, viewed_at);

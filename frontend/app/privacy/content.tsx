@@ -11,7 +11,7 @@ interface LegalContent {
 export const privacyContent: Record<Locale, LegalContent> = {
   en: {
     title: 'Privacy Policy',
-    lastUpdated: 'Last updated: June 2026',
+    lastUpdated: 'Last updated: November 2026',
     body: (
       <>
         <section>
@@ -25,7 +25,34 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">2. How We Use Your Information</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">2. Cookies and Viewing Data</h2>
+          <p className="text-muted-foreground">
+            On your first visit, a banner asks whether you consent to cookies for view counting,
+            deck analytics, and error screen recordings. We store your choice in a cookie
+            (<code>hiravi_consent</code>, valid for about six months). You can change it at any
+            time from &quot;Cookie settings&quot; at the bottom of each page. If you decline, we do
+            not record your views or send error screen recordings.
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            If you consent, visitors who are not signed in receive an anonymous identifier in a
+            cookie (<code>anon_id</code>, valid for one year). Signed-in users are identified by
+            their account ID instead. When you like a deck, the same cookie is used to prevent
+            duplicate likes, whether or not you have consented. When a slide deck is viewed with
+            consent, we record the deck, this identifier, the date and time, and the traffic
+            source: a category such as X, Facebook, a search engine, or direct access, plus the
+            domain name of the referring site and any <code>utm_source</code> value in the
+            link. We do not store the full URL of the referring page.
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            We use this data to show each deck&apos;s view count and to give deck owners
+            aggregated analytics, such as daily views and traffic sources. Owners cannot see
+            who viewed their decks. Views by a deck&apos;s owner and by known bots are not
+            recorded. Deleting your browser cookies resets the anonymous identifier.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 font-heading text-xl font-semibold">3. How We Use Your Information</h2>
           <p className="text-muted-foreground">
             We use collected information to operate and improve Hiravi, process your slide
             decks for translation, communicate with you about your account, and ensure the
@@ -34,7 +61,7 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">3. Data Storage</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">4. Data Storage</h2>
           <p className="text-muted-foreground">
             Uploaded files and processed slide decks are stored on Amazon Web Services (AWS)
             infrastructure in the US East region. We retain your data for as long as your
@@ -44,16 +71,19 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">4. Third-Party Services</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">5. Third-Party Services</h2>
           <p className="text-muted-foreground">
             We use the following third-party services: Clerk for authentication, Amazon Web
-            Services for storage and processing, and Amazon Translate for language translation.
+            Services for storage and processing, Amazon Translate for language translation,
+            Vercel for hosting and cookieless, anonymous traffic statistics, and Sentry for
+            error monitoring. Screen recordings around an error are sent to Sentry only if you
+            have consented to cookies.
             Each provider has their own privacy policy governing their use of data.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">5. Your Rights</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">6. Your Rights</h2>
           <p className="text-muted-foreground">
             You have the right to access, correct, or delete your personal data. You may also
             request that we restrict processing or export your data. To exercise these rights,
@@ -62,7 +92,7 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">6. Contact</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">7. Contact</h2>
           <p className="text-muted-foreground">
             For privacy-related questions or requests, please reach out via our GitHub
             repository or the contact information provided in your account settings.
@@ -73,7 +103,7 @@ export const privacyContent: Record<Locale, LegalContent> = {
   },
   ja: {
     title: 'プライバシーポリシー',
-    lastUpdated: '最終更新: 2026年6月',
+    lastUpdated: '最終更新: 2026年11月',
     body: (
       <>
         {/* 要法務確認: 暫定訳。正式文言に差し替え予定 */}
@@ -88,7 +118,32 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">2. 情報の利用方法</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">2. Cookie と閲覧データ</h2>
+          <p className="text-muted-foreground">
+            初回の訪問時に、閲覧数の集計、アクセス分析、エラー発生時の画面記録のための Cookie 利用に
+            同意するかをバナーで確認します。選択の結果は Cookie（<code>hiravi_consent</code>、有効期間は約6か月）に
+            保存します。各ページ下部の「Cookie 設定」からいつでも変更できます。同意しない場合、
+            閲覧の記録とエラー時の画面記録の送信は行いません。
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            同意した場合、ログインしていない閲覧者には匿名の識別子を Cookie（<code>anon_id</code>、
+            有効期間1年）に保存します。ログイン中の方は、匿名の識別子の代わりにアカウント ID で識別します。
+            いいねをした場合は、同意の有無にかかわらず、重複いいねを防ぐために同じ Cookie を利用します。
+            同意のうえでスライドデッキが閲覧されると、そのデッキ、上記の識別子、
+            閲覧日時、流入元を記録します。流入元とは、X・Facebook・検索エンジン・ダイレクトといった
+            分類、参照元サイトのドメイン名、リンクに含まれる <code>utm_source</code> の値です。
+            参照元ページのフル URL は保存しません。
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            これらのデータは、各デッキの閲覧数の表示と、デッキ所有者への集計済みのアクセス分析
+            （日別の閲覧数や流入元など）の提供に利用します。誰が閲覧したかを所有者が知ることは
+            できません。所有者自身の閲覧と、Bot と判定したアクセスは記録しません。ブラウザの Cookie を
+            削除すると、匿名の識別子はリセットされます。
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 font-heading text-xl font-semibold">3. 情報の利用方法</h2>
           <p className="text-muted-foreground">
             収集した情報は、Hiravi の運営および改善、スライドデッキの翻訳処理、
             アカウントに関するご連絡、ならびにサービスのセキュリティ確保のために利用します。
@@ -97,7 +152,7 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">3. データの保管</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">4. データの保管</h2>
           <p className="text-muted-foreground">
             アップロードされたファイルおよび処理済みのスライドデッキは、米国東部リージョンの
             Amazon Web Services（AWS）インフラ上に保管されます。データはアカウントが
@@ -107,16 +162,18 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">4. 第三者サービス</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">5. 第三者サービス</h2>
           <p className="text-muted-foreground">
             当サービスは次の第三者サービスを利用します: 認証に Clerk、保管・処理に Amazon Web
-            Services、言語翻訳に Amazon Translate。各提供者は、データの取り扱いに関する
+            Services、言語翻訳に Amazon Translate、ホスティングと Cookie を使わない匿名のアクセス統計に
+            Vercel、エラー監視に Sentry。エラー発生時の画面操作の記録は、Cookie に同意した場合にのみ
+            Sentry へ送信します。各提供者は、データの取り扱いに関する
             独自のプライバシーポリシーを有しています。
           </p>
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">5. お客様の権利</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">6. お客様の権利</h2>
           <p className="text-muted-foreground">
             お客様は、ご自身の個人データへのアクセス、訂正、または削除を求める権利を有します。
             また、処理の制限やデータのエクスポートを請求することもできます。これらの権利を
@@ -125,7 +182,7 @@ export const privacyContent: Record<Locale, LegalContent> = {
         </section>
 
         <section>
-          <h2 className="mb-3 font-heading text-xl font-semibold">6. お問い合わせ</h2>
+          <h2 className="mb-3 font-heading text-xl font-semibold">7. お問い合わせ</h2>
           <p className="text-muted-foreground">
             プライバシーに関するご質問やご請求は、当方の GitHub リポジトリ、または
             アカウント設定に記載の連絡先までお寄せください。

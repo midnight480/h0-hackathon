@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
+import { ConsentSettingsButton } from '@/components/consent-banner'
 
 export function SiteFooter() {
   return (
@@ -33,7 +34,10 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t border-border/70 pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>© 2026 Hiravi. ひらり、ひらく。</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p>© 2026 Hiravi. ひらり、ひらく。</p>
+            <ConsentSettingsButton />
+          </div>
           <p>Translations are machine-generated and may contain errors.</p>
         </div>
       </div>

@@ -10,10 +10,10 @@ Sentry.init({
   // パフォーマンストレース
   tracesSampleRate: 1,
 
-  // Session Replay: エラー発生時のみ録画（通常セッションは録画しない）
+  // Session Replay: エラー発生時のみ録画（通常セッションは録画しない）。
+  // 画面記録は Cookie 同意後にのみ有効化する（components/consent-banner.tsx で addIntegration）。
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: 0,
-  integrations: [Sentry.replayIntegration()],
 
   debug: false,
 })
