@@ -51,6 +51,14 @@ export const en = {
       'Upload a deck and watch it reach readers who never could have read it before.',
     ctaButton: 'Upload your first deck',
   },
+  consent: {
+    title: 'About cookies',
+    body: "We use cookies and similar technologies to count views, provide deck analytics, and record the screen when an error occurs. If you decline, none of this happens, and features such as likes keep working.",
+    policy: 'Privacy Policy',
+    accept: 'Accept',
+    deny: 'Decline',
+    settings: 'Cookie settings',
+  },
   analytics: {
     title: 'Analytics',
     back: 'Back to dashboard',

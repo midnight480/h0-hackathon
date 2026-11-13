@@ -7,6 +7,7 @@ import { cookies, headers } from 'next/headers'
 import { randomUUID } from 'crypto'
 import { withDb } from '@/lib/db'
 import { isBotUserAgent } from '@/lib/bot'
+import { CONSENT_COOKIE } from '@/lib/consent'
 import { type ViewContext, classifySource } from '@/lib/referrer'
 
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' })
@@ -151,11 +152,14 @@ export async function hasLikedDeck(deckId: string): Promise<boolean> {
 // - deck_view_events: 閲覧ごとのイベント（日別推移・流入元の分析用）を毎回 INSERT
 // - deck_views / decks.views: 閲覧者ごとに初回のみ加算（一覧に出すトータルのユニーク View 数）
 // クライアント（DeckViewer のマウント時 beacon）から呼ばれるため、JS を実行しないクローラーは計上されない。
-// 除外条件: Bot UA / 所有者自身の閲覧 / 非公開デッキ / 削除済みデッキ。
+// 除外条件: Cookie 同意なし / Bot UA / 所有者自身の閲覧 / 非公開デッキ / 削除済みデッキ。
 export async function recordDeckView(
   deckId: string,
   ctx: ViewContext = {},
 ): Promise<{ counted: boolean }> {
+  // Cookie 同意（閲覧分析）が無い場合は識別子の発行も記録も行わない
+  if ((await cookies()).get(CONSENT_COOKIE)?.value !== 'granted') return { counted: false }
+
   const h = await headers()
   if (isBotUserAgent(h.get('user-agent'))) return { counted: false }
 

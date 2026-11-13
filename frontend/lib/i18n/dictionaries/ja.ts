@@ -53,6 +53,14 @@ export const ja: Dictionary = {
       'デッキをアップロードすれば、これまで読めなかった人たちにも届きます。',
     ctaButton: '最初のデッキをアップロード',
   },
+  consent: {
+    title: 'Cookie の利用について',
+    body: '閲覧数の集計とアクセス分析、エラー発生時の画面記録のために Cookie などを利用します。同意しない場合、これらは行いません（いいね等の機能はそのまま使えます）。',
+    policy: 'プライバシーポリシー',
+    accept: '同意する',
+    deny: '同意しない',
+    settings: 'Cookie 設定',
+  },
   analytics: {
     title: 'アクセス分析',
     back: 'ダッシュボードへ戻る',

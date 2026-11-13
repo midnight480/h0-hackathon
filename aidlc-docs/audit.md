@@ -255,3 +255,11 @@
 **Context**: Operations。PR #29 に追加コミット。
 
 ---
+
+## Operations - Cookie 同意バナー（deck-view-analytics）
+**Timestamp**: 2026-11-13T04:20:00Z
+**User Input**: "2"
+**AI Response**: 同意バナーを実装した（選択肢2）。`lib/consent.ts`（`hiravi_consent` Cookie・約6か月）、`components/consent-banner.tsx`（同意する／同意しない・フッターの「Cookie 設定」から再選択）、`app/layout.tsx`（SSR で同意状態を解決しバナーのちらつきを防止）。同意がない場合、`recordDeckView` はサーバー側でも何もしない。ビューアは同意済みのときだけ送信し、閲覧中に同意したらその時点で1回送信する。Sentry Session Replay は同意後にのみ addIntegration し、拒否時は停止する。いいねはユーザー操作による必須機能として同意なしでも動かす。プライバシーポリシーを同意の仕組みに合わせて更新した。検証: vitest 42件 PASS・build 成功・ローカルのブラウザでバナー表示、同意後の非表示（再読み込み後も維持）、「Cookie 設定」での再表示、「同意しない」を確認した。
+**Context**: Operations。PR #29 に追加コミット。
+
+---

@@ -5,6 +5,9 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
 import Script from 'next/script'
+import { cookies } from 'next/headers'
+import { ConsentBanner } from '@/components/consent-banner'
+import { CONSENT_COOKIE, parseConsent } from '@/lib/consent'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { LocaleProvider } from '@/lib/i18n/locale-provider'
@@ -52,6 +55,8 @@ export default async function RootLayout({
 }>) {
   // Cookie から UI ロケールを解決し、対応する辞書のみをクライアントへ渡す。
   const { locale, dictionary } = await getServerI18n()
+  // 同意状態を SSR 時点で解決し、同意済みの訪問者にバナーがちらつかないようにする
+  const consent = parseConsent((await cookies()).get(CONSENT_COOKIE)?.value)
 
   return (
     <html
@@ -72,6 +77,7 @@ export default async function RootLayout({
             <ThemeProvider>
               <div className="flex min-h-screen flex-col">{children}</div>
               <Toaster position="bottom-right" />
+              <ConsentBanner initialConsent={consent} />
             </ThemeProvider>
           </LocaleProvider>
           <Analytics />

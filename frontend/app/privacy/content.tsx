@@ -27,10 +27,18 @@ export const privacyContent: Record<Locale, LegalContent> = {
         <section>
           <h2 className="mb-3 font-heading text-xl font-semibold">2. Cookies and Viewing Data</h2>
           <p className="text-muted-foreground">
-            To count views and likes, we store an anonymous identifier in a cookie
-            (<code>anon_id</code>, valid for one year) on visitors who are not signed in.
-            Signed-in users are identified by their account ID instead. When a slide deck is
-            viewed, we record the deck, this identifier, the date and time, and the traffic
+            On your first visit, a banner asks whether you consent to cookies for view counting,
+            deck analytics, and error screen recordings. We store your choice in a cookie
+            (<code>hiravi_consent</code>, valid for about six months). You can change it at any
+            time from &quot;Cookie settings&quot; at the bottom of each page. If you decline, we do
+            not record your views or send error screen recordings.
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            If you consent, visitors who are not signed in receive an anonymous identifier in a
+            cookie (<code>anon_id</code>, valid for one year). Signed-in users are identified by
+            their account ID instead. When you like a deck, the same cookie is used to prevent
+            duplicate likes, whether or not you have consented. When a slide deck is viewed with
+            consent, we record the deck, this identifier, the date and time, and the traffic
             source: a category such as X, Facebook, a search engine, or direct access, plus the
             domain name of the referring site and any <code>utm_source</code> value in the
             link. We do not store the full URL of the referring page.
@@ -67,8 +75,9 @@ export const privacyContent: Record<Locale, LegalContent> = {
           <p className="text-muted-foreground">
             We use the following third-party services: Clerk for authentication, Amazon Web
             Services for storage and processing, Amazon Translate for language translation,
-            Vercel for hosting, and Sentry for error monitoring (including recordings of the
-            screen around an error when one occurs).
+            Vercel for hosting and cookieless, anonymous traffic statistics, and Sentry for
+            error monitoring. Screen recordings around an error are sent to Sentry only if you
+            have consented to cookies.
             Each provider has their own privacy policy governing their use of data.
           </p>
         </section>
@@ -111,9 +120,16 @@ export const privacyContent: Record<Locale, LegalContent> = {
         <section>
           <h2 className="mb-3 font-heading text-xl font-semibold">2. Cookie と閲覧データ</h2>
           <p className="text-muted-foreground">
-            閲覧数といいねを数えるため、ログインしていない閲覧者には匿名の識別子を Cookie
-            （<code>anon_id</code>、有効期間1年）に保存します。ログイン中の方は、匿名の識別子の代わりに
-            アカウント ID で識別します。スライドデッキが閲覧されると、そのデッキ、上記の識別子、
+            初回の訪問時に、閲覧数の集計、アクセス分析、エラー発生時の画面記録のための Cookie 利用に
+            同意するかをバナーで確認します。選択の結果は Cookie（<code>hiravi_consent</code>、有効期間は約6か月）に
+            保存します。各ページ下部の「Cookie 設定」からいつでも変更できます。同意しない場合、
+            閲覧の記録とエラー時の画面記録の送信は行いません。
+          </p>
+          <p className="mt-3 text-muted-foreground">
+            同意した場合、ログインしていない閲覧者には匿名の識別子を Cookie（<code>anon_id</code>、
+            有効期間1年）に保存します。ログイン中の方は、匿名の識別子の代わりにアカウント ID で識別します。
+            いいねをした場合は、同意の有無にかかわらず、重複いいねを防ぐために同じ Cookie を利用します。
+            同意のうえでスライドデッキが閲覧されると、そのデッキ、上記の識別子、
             閲覧日時、流入元を記録します。流入元とは、X・Facebook・検索エンジン・ダイレクトといった
             分類、参照元サイトのドメイン名、リンクに含まれる <code>utm_source</code> の値です。
             参照元ページのフル URL は保存しません。
@@ -149,8 +165,9 @@ export const privacyContent: Record<Locale, LegalContent> = {
           <h2 className="mb-3 font-heading text-xl font-semibold">5. 第三者サービス</h2>
           <p className="text-muted-foreground">
             当サービスは次の第三者サービスを利用します: 認証に Clerk、保管・処理に Amazon Web
-            Services、言語翻訳に Amazon Translate、ホスティングに Vercel、エラー監視に Sentry
-            （エラー発生時の画面操作の記録を含む）。各提供者は、データの取り扱いに関する
+            Services、言語翻訳に Amazon Translate、ホスティングと Cookie を使わない匿名のアクセス統計に
+            Vercel、エラー監視に Sentry。エラー発生時の画面操作の記録は、Cookie に同意した場合にのみ
+            Sentry へ送信します。各提供者は、データの取り扱いに関する
             独自のプライバシーポリシーを有しています。
           </p>
         </section>

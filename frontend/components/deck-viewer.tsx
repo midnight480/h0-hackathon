@@ -38,6 +38,7 @@ import {
 import { useT } from '@/lib/i18n/locale-provider'
 import { cn } from '@/lib/utils'
 import { likeDeck, recordDeckView } from '@/app/actions/deck'
+import { CONSENT_CHANGE_EVENT, readConsent } from '@/lib/consent'
 
 type ViewMode = 'overlay' | 'text' | 'image'
 
@@ -164,33 +165,49 @@ export function DeckViewer({
   // View 数の計上（クライアント beacon）。JS を実行しないクローラーを自然に除外するため、
   // SSR ではなくマウント後に Server Action を呼ぶ。所有者の閲覧は送信しない（サーバー側でも除外）。
   // 同一閲覧者の重複はサーバーの一意制約で弾くため、StrictMode の二重実行でも二重加算されない。
+  // Cookie 同意済みの場合のみ送信する。閲覧中にバナーで同意した場合はその時点で 1 回送信する。
   useEffect(() => {
     if (isOwner) return
     let cancelled = false
-    const url = new URL(window.location.href)
-    // Next.js のクライアント遷移では document.referrer が初回ロード時のまま残るため、
-    // 初回ナビゲーションの URL と現在の URL が異なればサイト内遷移とみなす。
-    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-    let clientNavigation = false
-    if (nav?.name) {
-      try {
-        clientNavigation = new URL(nav.name).pathname !== url.pathname
-      } catch {}
-    }
-    recordDeckView(deck.id, {
-      referrer: document.referrer,
-      utmSource: url.searchParams.get('utm_source') ?? url.searchParams.get('ref'),
-      hasFbclid: url.searchParams.has('fbclid'),
-      clientNavigation,
-    })
-      .then((res) => {
-        if (!cancelled && res.counted) setViews((n) => n + 1)
+    let sent = false
+
+    const record = () => {
+      const url = new URL(window.location.href)
+      // Next.js のクライアント遷移では document.referrer が初回ロード時のまま残るため、
+      // 初回ナビゲーションの URL と現在の URL が異なればサイト内遷移とみなす。
+      const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+      let clientNavigation = false
+      if (nav?.name) {
+        try {
+          clientNavigation = new URL(nav.name).pathname !== url.pathname
+        } catch {}
+      }
+      recordDeckView(deck.id, {
+        referrer: document.referrer,
+        utmSource: url.searchParams.get('utm_source') ?? url.searchParams.get('ref'),
+        hasFbclid: url.searchParams.has('fbclid'),
+        clientNavigation,
       })
-      .catch(() => {})
+        .then((res) => {
+          if (!cancelled && res.counted) setViews((n) => n + 1)
+        })
+        .catch(() => {})
+    }
+
+    const send = () => {
+      if (sent || readConsent() !== 'granted') return
+      sent = true
+      record()
+    }
+
+    window.addEventListener(CONSENT_CHANGE_EVENT, send)
+    send()
     return () => {
       cancelled = true
+      window.removeEventListener(CONSENT_CHANGE_EVENT, send)
     }
   }, [deck.id, isOwner])
+
   const [isPending, startTransition] = useTransition()
 
   // オーバーレイ用ブロックを持つデッキか（旧デッキは layout が空なので無効化）
