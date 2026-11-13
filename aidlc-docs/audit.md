@@ -239,3 +239,11 @@
 **Context**: Build and Test 完了後の PR 作成。DSQL へのスキーマ反映は人間側の作業として残っている。
 
 ---
+
+## Operations - DSQL へのスキーマ反映（deck-view-analytics）
+**Timestamp**: 2026-11-13T03:45:00Z
+**User Input**: "（AWS 一時認証情報を貼り付け）使っていいよ"
+**AI Response**: 渡された一時認証情報で `cd src && npm run db:schema` を実行し、適用に成功した。確認したところ、`deck_views` は未マージの feat/ocr-gslides-import ブランチ（d861951）の実装で作成済みだった。列は `viewed_at`、主キーは (deck_id, viewer_id)、`idx_deck_views_deck_id` があり、既存の閲覧は13件（1デッキ）。今回の実装はこの定義のまま動く。schema.sql を実 DB の定義（`viewed_at`・`idx_deck_views_deck_id`）に合わせて修正した。`deck_view_events` は新規作成済み。認証情報はファイルに保存していない。
+**Context**: Operations。PR #29 に追加コミット。
+
+---
