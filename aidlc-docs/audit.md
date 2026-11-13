@@ -247,3 +247,11 @@
 **Context**: Operations。PR #29 に追加コミット。
 
 ---
+
+## Operations - プライバシーポリシー更新（deck-view-analytics）
+**Timestamp**: 2026-11-13T04:00:00Z
+**User Input**: "プライバシーポリシー更新してる？" / "同意バナーでる？"
+**AI Response**: ポリシーは未更新だったため、`app/privacy/content.tsx`（日英）に「2. Cookie と閲覧データ」を追加した。内容は anon_id Cookie（1年）、閲覧記録の項目（参照元はドメイン名のみ）、利用目的（集計済みの分析のみ・閲覧者は特定されない）、所有者自身と Bot の除外、Cookie 削除によるリセット。以降の節を繰り下げ、第三者サービスに Vercel と Sentry（エラー時の画面操作記録）を追記し、最終更新を2026年11月にした。Cookie の同意バナーは未実装であることを回答し、要否の判断をユーザーに委ねた。
+**Context**: Operations。PR #29 に追加コミット。
+
+---
